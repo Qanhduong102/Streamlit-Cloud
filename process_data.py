@@ -3,9 +3,10 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
+import joblib
 
 # Đọc và làm sạch dữ liệu
 df = pd.read_csv('customer_data.csv', parse_dates=['Purchase Date'], dtype={
@@ -37,16 +38,23 @@ features = customer_features.reset_index().merge(df[['Customer ID', 'Churn']].dr
 X = features[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']]
 y = features['Churn']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-model = LogisticRegression()
-model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
+churn_model = LogisticRegression()
+churn_model.fit(X_train, y_train)
+y_pred = churn_model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 print(f"Độ chính xác dự đoán churn: {accuracy:.2f}")
-
-# Lưu mô hình để dùng sau
-import joblib
-joblib.dump(model, 'churn_model.pkl')
+joblib.dump(churn_model, 'churn_model.pkl')
 joblib.dump(scaler, 'scaler.pkl')
+
+# Dự đoán doanh thu
+monthly_revenue = df.groupby(df['Purchase Date'].dt.to_period('M'))['Total Purchase Amount'].sum().reset_index()
+monthly_revenue['Month_Num'] = np.arange(len(monthly_revenue))
+X_rev = monthly_revenue[['Month_Num']]
+y_rev = monthly_revenue['Total Purchase Amount']
+revenue_model = LinearRegression()
+revenue_model.fit(X_rev, y_rev)
+joblib.dump(revenue_model, 'revenue_model.pkl')
+print(f"Đã huấn luyện mô hình dự đoán doanh thu và lưu vào 'revenue_model.pkl'")
 
 # Vẽ biểu đồ phân tích cơ bản
 # Doanh thu theo danh mục

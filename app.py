@@ -5,6 +5,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import joblib
 from io import BytesIO
+import numpy as np
 
 # Cấu hình trang
 st.set_page_config(page_title="Phân tích Hành vi Mua sắm", layout="wide", page_icon="📊", initial_sidebar_state="expanded")
@@ -30,39 +31,25 @@ def load_data():
 
 @st.cache_resource
 def load_models():
-    model = joblib.load('churn_model.pkl')
+    churn_model = joblib.load('churn_model.pkl')
     scaler = joblib.load('scaler.pkl')
-    return model, scaler
+    revenue_model = joblib.load('revenue_model.pkl')
+    return churn_model, scaler, revenue_model
 
 df, customer_segments = load_data()
-model, scaler = load_models()
+churn_model, scaler, revenue_model = load_models()
 
 # Header
 st.title("📊 Hệ thống Phân tích Hành vi Mua sắm Chuyên nghiệp")
-st.markdown("**Khám phá dữ liệu, phân khúc khách hàng và dự đoán churn với giao diện tối ưu!**", unsafe_allow_html=True)
+st.markdown("**Khám phá dữ liệu, phân khúc khách hàng và dự đoán với giao diện tối ưu!**", unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
     st.header("🔍 Bộ lọc Dữ liệu")
-    category_filter = st.multiselect(
-        "Danh mục sản phẩm",
-        options=['Tất cả'] + sorted(df['Product Category'].unique()),
-        default=['Tất cả'],
-        help="Chọn nhiều danh mục để phân tích"
-    )
-    gender_filter = st.multiselect(
-        "Giới tính",
-        options=['Tất cả'] + sorted(df['Gender'].unique()),
-        default=['Tất cả'],
-        help="Lọc theo giới tính khách hàng"
-    )
-    date_range = st.date_input(
-        "Phạm vi ngày",
-        value=(df['Purchase Date'].min(), df['Purchase Date'].max()),
-        min_value=df['Purchase Date'].min(),
-        max_value=df['Purchase Date'].max(),
-        help="Chọn khoảng thời gian"
-    )
+    category_filter = st.multiselect("Danh mục sản phẩm", options=['Tất cả'] + sorted(df['Product Category'].unique()), default=['Tất cả'])
+    gender_filter = st.multiselect("Giới tính", options=['Tất cả'] + sorted(df['Gender'].unique()), default=['Tất cả'])
+    date_range = st.date_input("Phạm vi ngày", value=(df['Purchase Date'].min(), df['Purchase Date'].max()), 
+                               min_value=df['Purchase Date'].min(), max_value=df['Purchase Date'].max())
     st.markdown("---")
     uploaded_file = st.file_uploader("Tải lên file CSV mới", type="csv")
     if uploaded_file:
@@ -70,7 +57,7 @@ with st.sidebar:
         new_df['Total Purchase Amount'] = new_df['Product Price'] * new_df['Quantity']
         new_df.to_csv('cleaned_customer_data.csv', index=False)
         st.success("Đã cập nhật dữ liệu mới!", icon="✅")
-        st.experimental_rerun()  # Tải lại trang để cập nhật dữ liệu
+        st.experimental_rerun()
     st.markdown("---")
     st.caption(f"Cập nhật lần cuối: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
 
@@ -83,21 +70,21 @@ if 'Tất cả' not in gender_filter:
 filtered_df = filtered_df[(filtered_df['Purchase Date'] >= pd.to_datetime(date_range[0])) & 
                           (filtered_df['Purchase Date'] <= pd.to_datetime(date_range[1]))]
 
-# Hiển thị thông tin tổng quan
+# Tổng quan
 st.write(f"**Tổng quan dữ liệu lọc**: {len(filtered_df):,} giao dịch | Tổng doanh thu: {filtered_df['Total Purchase Amount'].sum():,.0f} VND")
 
 # Tabs
-tabs = st.tabs(["📈 Phân tích Cơ bản", "👥 Phân khúc Khách hàng", "⚠️ Dự đoán Churn", "📅 Xu hướng Thời gian"])
+tabs = st.tabs(["📈 Phân tích Cơ bản", "👥 Phân khúc Khách hàng", "⚠️ Dự đoán Churn", "📅 Xu hướng Thời gian", 
+                "👤 Chi tiết Khách hàng", "📦 Phân tích Hoàn trả"])
 
-# Tab 1: Phân tích cơ bản
+# Tab 1: Phân tích Cơ bản
 with tabs[0]:
     st.subheader("Phân tích Cơ bản")
     col1, col2, col3 = st.columns([1, 1, 1], gap="small")
     with col1:
         revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
         fig1 = px.bar(revenue_by_category, x='Product Category', y='Total Purchase Amount', 
-                      title="Doanh thu theo Danh mục", color='Product Category', 
-                      text_auto='.2s', height=400)
+                      title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
         fig1.update_traces(textposition='outside')
         st.plotly_chart(fig1, use_container_width=True)
     with col2:
@@ -112,8 +99,13 @@ with tabs[0]:
                       color_discrete_sequence=['#ff6f61'], height=400)
         fig3.update_traces(textposition='outside')
         st.plotly_chart(fig3, use_container_width=True)
+    st.subheader("Gợi ý Hành động")
+    low_transaction_day = filtered_df.groupby('Day of Week')['Customer ID'].count().idxmin()
+    st.write(f"- Tăng khuyến mãi vào {low_transaction_day} (ngày ít giao dịch nhất).")
+    top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()
+    st.write(f"- Tập trung quảng bá {top_category} (danh mục doanh thu cao nhất).")
 
-# Tab 2: Phân khúc khách hàng
+# Tab 2: Phân khúc Khách hàng
 with tabs[1]:
     st.subheader("Phân khúc Khách hàng")
     with st.expander("🔎 Chi tiết các nhóm khách hàng", expanded=False):
@@ -128,29 +120,59 @@ with tabs[1]:
 # Tab 3: Dự đoán Churn
 with tabs[2]:
     st.subheader("Dự đoán Khách hàng Rời bỏ")
-    with st.container():
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d", help="Nhập ID để dự đoán")
-        with col2:
-            predict_button = st.button("Dự đoán", key="predict", use_container_width=True)
-        if predict_button:
-            customer_data = customer_segments[customer_segments['Customer ID'] == customer_id]
-            if not customer_data.empty:
-                X = scaler.transform(customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-                churn_pred = model.predict(X)[0]
-                st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'}", icon="✅")
-            else:
-                st.error(f"Không tìm thấy khách hàng {customer_id}!", icon="❌")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d")
+    with col2:
+        predict_button = st.button("Dự đoán", key="predict", use_container_width=True)
+    if predict_button:
+        customer_data = customer_segments[customer_segments['Customer ID'] == customer_id]
+        if not customer_data.empty:
+            X = scaler.transform(customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
+            churn_pred = churn_model.predict(X)[0]
+            st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'}", icon="✅")
+            if churn_pred:
+                st.write("**Gợi ý**: Gửi ưu đãi giảm giá hoặc email cá nhân hóa để giữ chân khách hàng này.")
+        else:
+            st.error(f"Không tìm thấy khách hàng {customer_id}!", icon="❌")
 
-# Tab 4: Xu hướng thời gian
+# Tab 4: Xu hướng Thời gian
 with tabs[3]:
     st.subheader("Xu hướng Theo Thời gian")
     monthly_revenue = filtered_df.groupby(filtered_df['Purchase Date'].dt.to_period('M'))['Total Purchase Amount'].sum().reset_index()
-    monthly_revenue['Purchase Date'] = monthly_revenue['Purchase Date'].astype(str)  # Chuyển Period thành chuỗi
+    monthly_revenue['Month_Num'] = np.arange(len(monthly_revenue))
+    monthly_revenue['Purchase Date'] = monthly_revenue['Purchase Date'].astype(str)
     fig5 = px.line(monthly_revenue, x='Purchase Date', y='Total Purchase Amount', 
                    title="Doanh thu Theo Tháng", height=400, line_shape='spline')
     st.plotly_chart(fig5, use_container_width=True)
+    # Dự đoán doanh thu
+    future_months = np.arange(len(monthly_revenue), len(monthly_revenue) + 3).reshape(-1, 1)
+    future_pred = revenue_model.predict(future_months)
+    st.write("Dự đoán doanh thu 3 tháng tới:")
+    st.line_chart(pd.DataFrame({'Dự đoán': future_pred}, index=[f"Tháng {i+1}" for i in range(3)]))
+
+# Tab 5: Chi tiết Khách hàng
+with tabs[4]:
+    st.subheader("Chi tiết Khách hàng")
+    customer_id = st.number_input("Nhập Customer ID để xem chi tiết:", min_value=1, step=1)
+    customer_data = filtered_df[filtered_df['Customer ID'] == customer_id]
+    if not customer_data.empty:
+        st.write(f"Tổng chi tiêu: {customer_data['Total Purchase Amount'].sum():,.0f} VND")
+        st.dataframe(customer_data[['Purchase Date', 'Product Category', 'Total Purchase Amount', 'Returns']])
+        fig = px.line(customer_data, x='Purchase Date', y='Total Purchase Amount', 
+                      title=f"Lịch sử mua sắm của {customer_id}", height=400)
+        st.plotly_chart(fig)
+    else:
+        st.warning("Không tìm thấy khách hàng này!")
+
+# Tab 6: Phân tích Hoàn trả
+with tabs[5]:
+    st.subheader("Phân tích Hoàn trả")
+    return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
+    fig6 = px.bar(return_rate, x='Product Category', y='Returns', 
+                  title="Tỷ lệ Hoàn trả theo Danh mục", text_auto='.2%', height=400)
+    fig6.update_traces(textposition='outside')
+    st.plotly_chart(fig6, use_container_width=True)
 
 # Xuất báo cáo PDF
 def generate_pdf():
@@ -161,10 +183,13 @@ def generate_pdf():
     c.drawString(100, 750, "Báo cáo Phân tích Hành vi Mua sắm")
     c.setFillColorRGB(0, 0, 0)
     c.setFont("Helvetica", 12)
-    c.drawString(100, 730, f"Tổng doanh thu (lọc): {filtered_df['Total Purchase Amount'].sum():,.0f} VND")
+    c.drawString(100, 730, f"Tổng doanh thu: {filtered_df['Total Purchase Amount'].sum():,.0f} VND")
     c.drawString(100, 710, f"Số giao dịch: {len(filtered_df):,}")
-    c.drawString(100, 690, f"Ngày cập nhật: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
-    c.line(100, 680, 500, 680)
+    c.drawString(100, 690, f"Top danh mục: {filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()}")
+    c.drawString(100, 670, f"Nhóm khách hàng chi tiêu cao nhất: Cluster {customer_segments.groupby('Cluster')['Total Purchase Amount'].mean().idxmax()}")
+    c.drawString(100, 650, f"Dự đoán doanh thu tháng tới: {int(revenue_model.predict([[len(monthly_revenue)]])):,} VND")
+    c.line(100, 640, 500, 640)
+    c.drawString(100, 620, f"Ngày cập nhật: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
     c.save()
     buffer.seek(0)
     return buffer
@@ -173,13 +198,8 @@ with st.sidebar:
     st.markdown("---")
     if st.button("📥 Xuất Báo cáo PDF", key="export", use_container_width=True):
         pdf_buffer = generate_pdf()
-        st.download_button(
-            label="Tải Báo cáo PDF",
-            data=pdf_buffer,
-            file_name="purchase_analysis_report.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
+        st.download_button(label="Tải Báo cáo PDF", data=pdf_buffer, file_name="purchase_analysis_report.pdf", 
+                           mime="application/pdf", use_container_width=True)
         st.success("Báo cáo đã sẵn sàng để tải!", icon="📄")
 
 # Footer
