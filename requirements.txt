@@ -5,3 +5,4 @@ reportlab
 scikit-learn
 streamlit
 joblib
+matplotlib
