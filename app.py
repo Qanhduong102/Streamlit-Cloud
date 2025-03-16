@@ -6,6 +6,8 @@ from reportlab.pdfgen import canvas
 import joblib
 from io import BytesIO
 import numpy as np
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # Cấu hình trang
 st.set_page_config(page_title="Phân tích Hành vi Mua sắm", layout="wide", page_icon="📊", initial_sidebar_state="expanded")
@@ -22,13 +24,28 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Tải dữ liệu và mô hình
+# Tải dữ liệu từ Google Sheets
 @st.cache_data
-def load_data():
-    df = pd.read_csv('cleaned_customer_data.csv', parse_dates=['Purchase Date'])
-    customer_segments = pd.read_csv('customer_segments.csv')
+def load_data_from_sheets():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+    client = gspread.authorize(creds)
+    sheet = client.open("Purchase Data").sheet1  # Thay "Purchase Data" bằng tên Sheets của bạn nếu khác
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    # Chuyển đổi kiểu dữ liệu cho khớp với code cũ
+    df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
+    df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
+    df['Customer ID'] = df['Customer ID'].astype(int)
+    df['Returns'] = df['Returns'].astype(float)
+    df['Age'] = df['Age'].astype(int)
+    df['Churn'] = df['Churn'].astype(int)
+    df['Year'] = df['Year'].astype(int)
+    df['Month'] = df['Month'].astype(int)
+    customer_segments = pd.read_csv('customer_segments.csv')  # Giữ file này local tạm thời
     return df, customer_segments
 
+# Tải mô hình
 @st.cache_resource
 def load_models():
     churn_model = joblib.load('churn_model.pkl')
@@ -36,7 +53,7 @@ def load_models():
     revenue_model = joblib.load('revenue_model.pkl')
     return churn_model, scaler, revenue_model
 
-df, customer_segments = load_data()
+df, customer_segments = load_data_from_sheets()
 churn_model, scaler, revenue_model = load_models()
 
 # Header
@@ -50,14 +67,6 @@ with st.sidebar:
     gender_filter = st.multiselect("Giới tính", options=['Tất cả'] + sorted(df['Gender'].unique()), default=['Tất cả'])
     date_range = st.date_input("Phạm vi ngày", value=(df['Purchase Date'].min(), df['Purchase Date'].max()), 
                                min_value=df['Purchase Date'].min(), max_value=df['Purchase Date'].max())
-    st.markdown("---")
-    uploaded_file = st.file_uploader("Tải lên file CSV mới", type="csv")
-    if uploaded_file:
-        new_df = pd.read_csv(uploaded_file, parse_dates=['Purchase Date'])
-        new_df['Total Purchase Amount'] = new_df['Product Price'] * new_df['Quantity']
-        new_df.to_csv('cleaned_customer_data.csv', index=False)
-        st.success("Đã cập nhật dữ liệu mới!", icon="✅")
-        st.experimental_rerun()
     st.markdown("---")
     st.caption(f"Cập nhật lần cuối: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
 
@@ -145,7 +154,6 @@ with tabs[3]:
     fig5 = px.line(monthly_revenue, x='Purchase Date', y='Total Purchase Amount', 
                    title="Doanh thu Theo Tháng", height=400, line_shape='spline')
     st.plotly_chart(fig5, use_container_width=True)
-    # Dự đoán doanh thu
     future_months = np.arange(len(monthly_revenue), len(monthly_revenue) + 3).reshape(-1, 1)
     future_pred = revenue_model.predict(future_months)
     st.write("Dự đoán doanh thu 3 tháng tới:")
