@@ -21,6 +21,36 @@ st.markdown("""
     .stButton>button:hover {background-color: #1e5b9f;}
     h1 {color: #2e7bcf; font-family: 'Arial', sans-serif;}
     .stTab {background-color: #ffffff; border-radius: 10px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+    .footer {
+        background: linear-gradient(90deg, #2e7bcf, #4a90e2);
+        color: #ffffff;
+        text-align: center;
+        padding: 15px 0;
+        position: relative;
+        bottom: 0;
+        width: 100%;
+        font-family: 'Arial', sans-serif;
+        font-size: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .footer a {
+        color: #ffffff;
+        text-decoration: none;
+        margin: 0 10px;
+        transition: color 0.3s ease;
+    }
+    .footer a:hover {
+        color: #ffd700; /* Màu vàng khi hover để tạo điểm nhấn */
+    }
+    .footer .social-icons a {
+        font-size: 18px;
+        margin: 0 8px;
+    }
+    @media (max-width: 768px) {
+        .footer {padding: 10px 0;}
+        .footer .social-icons a {margin: 0 5px;}
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -211,5 +241,14 @@ with st.sidebar:
         st.success("Báo cáo đã sẵn sàng để tải!", icon="📄")
 
 # Footer
-st.markdown("---")
-st.markdown("<p style='text-align: center; color: #666;'>© 2025 - Phát triển bởi KTDL-9 Team</p>", unsafe_allow_html=True)
+st.markdown("""
+    <div class="footer">
+        <p>© 2025 - Phát triển bởi <a href="https://example.com" target="_blank">KTDL-9 Team</a></p>
+        <div class="social-icons">
+            <a href="https://facebook.com" target="_blank"><i class="fab fa-facebook-f"></i></a>
+            <a href="https://twitter.com" target="_blank"><i class="fab fa-twitter"></i></a>
+            <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin-in"></i></a>
+            <a href="mailto:contact@ktdl9team.com"><i class="fas fa-envelope"></i></a>
+        </p>
+    </div>
+""", unsafe_allow_html=True)
