@@ -15,7 +15,7 @@ h1 {color: #2e7bcf; font-family: 'Arial', sans-serif;}
     vertical-align: middle;
 }
 .predict-container .stButton {
-    margin-top: 0 !important; /* Loại bỏ margin trên của nút */
+    margin-top: 10px !important; /* Thêm khoảng cách nhỏ để nút thấp xuống */
     vertical-align: middle;
 }
 
