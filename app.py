@@ -8,16 +8,10 @@ from reportlab.pdfgen import canvas
 import joblib
 from io import BytesIO
 import numpy as np
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
-from io import BytesIO
-import pandas as pd
 
 # Tăng giới hạn số ô tối đa cho Pandas Styler
 pd.set_option("styler.render.max_elements", 998336)
@@ -80,15 +74,10 @@ elif st.session_state.get('authentication_status'):
     st.markdown(f'<div class="success-message">Chào mừng {name}!</div>', unsafe_allow_html=True)
     authenticator.logout("Đăng xuất", "sidebar")
 
-    # Tải dữ liệu từ Google Sheets
+    # Tải dữ liệu từ file CSV cục bộ (thay thế Google Sheets)
     @st.cache_data
-    def load_data_from_sheets():
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-        client = gspread.authorize(creds)
-        sheet = client.open("Purchase Data").sheet1  # Thay "Purchase Data" bằng tên Sheets của bạn nếu khác
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
+    def load_data_from_csv():
+        df = pd.read_csv("purchase_data.csv")  # Thay bằng file CSV của bạn
         df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
         df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
         df['Customer ID'] = df['Customer ID'].astype(int)
@@ -97,7 +86,7 @@ elif st.session_state.get('authentication_status'):
         df['Churn'] = df['Churn'].astype(int)
         df['Year'] = df['Year'].astype(int)
         df['Month'] = df['Month'].astype(int)
-        customer_segments = pd.read_csv('customer_segments.csv')
+        customer_segments = pd.read_csv('customer_segments.csv')  # Giữ nguyên file này nếu có
         return df, customer_segments
 
     # Tải mô hình
@@ -108,7 +97,7 @@ elif st.session_state.get('authentication_status'):
         revenue_model = joblib.load('revenue_model.pkl')
         return churn_model, scaler, revenue_model
 
-    df, customer_segments = load_data_from_sheets()
+    df, customer_segments = load_data_from_csv()
     churn_model, scaler, revenue_model = load_models()
 
     # Header
@@ -477,7 +466,7 @@ elif st.session_state.get('authentication_status'):
         # Tiêu đề báo cáo
         c.setFillColorRGB(0.18, 0.48, 0.81)
         c.setFont("TimesNewRoman-Bold", 16)
-        c.drawString(100, 750, "Báo cáo Phân tích Hành tươi Mua sắm")
+        c.drawString(100, 750, "Báo cáo Phân tích Hành vi Mua sắm")
         c.setFont("TimesNewRoman", 12)
         c.setFillColorRGB(0, 0, 0)
         c.drawString(100, 730, f"Ngày cập nhật: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
