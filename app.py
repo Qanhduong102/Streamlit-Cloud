@@ -33,7 +33,7 @@ authenticator = stauth.Authenticate(
 )
 
 # Giao diện đăng nhập
-name, authentication_status, username = authenticator.login(fields="Đăng nhập", location="main")
+name, authentication_status, username = authenticator.login(fields={'Form name': 'Đăng nhập'}, location='main')
 
 # Kiểm tra trạng thái đăng nhập
 if authentication_status:
