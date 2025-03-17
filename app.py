@@ -141,38 +141,84 @@ elif st.session_state.get('authentication_status'):
     with tabs[0]:
         st.subheader("Phân tích Cơ bản")
         col1, col2, col3 = st.columns([1, 1, 1], gap="small")
+    
         with col1:
             revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
             fig1 = px.bar(revenue_by_category, x='Product Category', y='Total Purchase Amount', 
-                          title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
+                      title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
             fig1.update_traces(textposition='outside')
             st.plotly_chart(fig1, use_container_width=True)
+    
         with col2:
-            purchases_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Customer ID'].count().reset_index()
-            fig2 = px.line(purchases_by_day, x='Purchase Date', y='Customer ID', 
-                           title="Giao dịch theo Ngày", height=400, line_shape='spline')
+            revenue_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
+            fig2 = px.line(revenue_by_day, x='Purchase Date', y='Total Purchase Amount', 
+                       title="Doanh thu Theo Ngày", height=400, line_shape='spline')
             st.plotly_chart(fig2, use_container_width=True)
+    
         with col3:
-            top_spenders = filtered_df.groupby('Customer ID')['Total Purchase Amount'].sum().nlargest(5).reset_index()
+            top_spenders = filtered_df.groupby('Customer ID').agg({
+                'Total Purchase Amount': 'sum',
+                'Purchase Date': 'count',
+                'Product Category': lambda x: x.mode()[0]
+            }).nlargest(5, 'Total Purchase Amount').reset_index()
+            top_spenders.columns = ['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Favorite Category']
             fig3 = px.bar(top_spenders, x='Customer ID', y='Total Purchase Amount', 
-                          title="Top 5 Khách hàng", text=top_spenders['Customer ID'].astype(str), 
-                          color_discrete_sequence=['#ff6f61'], height=400)
+                      title="Top 5 Khách hàng Chi tiêu Cao nhất", 
+                      text=top_spenders['Customer ID'].astype(str) + ' (' + top_spenders['Transaction Count'].astype(str) + ' GD)',
+                      color_discrete_sequence=['#ff6f61'], height=400)
             fig3.update_traces(textposition='outside')
             st.plotly_chart(fig3, use_container_width=True)
+            st.write("**Chi tiết Top 5 Khách hàng:**")
+            st.dataframe(top_spenders.style.format({
+                'Total Purchase Amount': '{:,.0f} VND',
+                'Transaction Count': '{:,}',
+            }))
+    
+        # Phân tích chi tiết danh mục theo ngày
+        st.subheader("Chi tiết Danh mục Theo Ngày")
+        # Bộ lọc danh mục
+        selected_category = st.selectbox("Chọn danh mục để xem chi tiết:", 
+                                     options=['Tất cả'] + sorted(filtered_df['Product Category'].unique()),
+                                     index=0)
+    
+        # Dữ liệu doanh thu theo ngày cho danh mục
+        if selected_category == 'Tất cả':
+            category_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
+        else:
+            category_by_day = filtered_df[filtered_df['Product Category'] == selected_category].groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
+    
+        # Biểu đồ doanh thu theo ngày cho danh mục
+        fig_category_day = px.line(category_by_day, x='Purchase Date', y='Total Purchase Amount', 
+                               title=f"Doanh thu Theo Ngày của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", 
+                               height=400, line_shape='spline')
+        st.plotly_chart(fig_category_day, use_container_width=True)
+    
+        # Bảng dữ liệu chi tiết
+        with st.expander(f"🔎 Xem dữ liệu chi tiết của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", expanded=False):
+            if selected_category == 'Tất cả':
+                detailed_data = filtered_df.groupby(['Purchase Date', 'Product Category'])['Total Purchase Amount'].sum().unstack().fillna(0)
+            else:
+                detailed_data = filtered_df[filtered_df['Product Category'] == selected_category].groupby('Purchase Date')['Total Purchase Amount'].sum().reset_index()
+            st.dataframe(detailed_data.style.format('{:,.0f} VND'))
+    
         st.subheader("Gợi ý Hành động")
         low_transaction_day = filtered_df.groupby('Day of Week')['Customer ID'].count().idxmin()
-        st.write(f"- Tăng khuyến mãi vào {low_transaction_day} (ngày ít giao dịch nhất).")
-        top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()
-        st.write(f"- Tập trung quảng bá {top_category} (danh mục doanh thu cao nhất).")
+        low_day_revenue = filtered_df.groupby('Day of Week')['Total Purchase Amount'].sum().min()
+        st.write(f"- Tăng khuyến mãi 15% vào {low_transaction_day} (doanh thu thấp nhất: {low_day_revenue:,.0f} VND) qua email hoặc SMS.")
     
-        # Gợi ý cá nhân hóa cho khách hàng VIP
-        vip_customers = filtered_df.groupby('Customer ID')['Total Purchase Amount'].sum().nlargest(5).index
-        recent_activity = filtered_df[filtered_df['Customer ID'].isin(vip_customers)].groupby('Customer ID')['Purchase Date'].max()
-        inactive_vips = recent_activity[recent_activity < pd.Timestamp.now() - pd.Timedelta(days=30)].index
-        if not inactive_vips.empty:
-            st.write("- **Khách hàng VIP không hoạt động gần đây**:")
-            for vip in inactive_vips:
-                st.write(f"  - Khách hàng {vip}: Gửi ưu đãi 20% để khuyến khích quay lại.")
+        top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()
+        top_category_revenue = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().max()
+        st.write(f"- Đẩy mạnh quảng bá {top_category} (doanh thu: {top_category_revenue:,.0f} VND) qua mạng xã hội và banner trên website.")
+    
+        st.write("- **Chiến lược cho Top Khách hàng:**")
+        for vip in top_spenders['Customer ID']:
+            vip_data = filtered_df[filtered_df['Customer ID'] == vip]
+            last_purchase = vip_data['Purchase Date'].max()
+            fav_category = vip_data['Product Category'].mode()[0]
+            if (pd.Timestamp.now() - last_purchase).days > 30:
+                st.write(f"  - Khách hàng {vip}: Không hoạt động {(pd.Timestamp.now() - last_purchase).days} ngày. Gửi ưu đãi 20% cho {fav_category}.")
+            else:
+                st.write(f"  - Khách hàng {vip}: Duy trì hoạt động. Tặng điểm thưởng hoặc giảm giá 10% cho {fav_category} để khuyến khích mua tiếp.")
 
     # Tab 2: Phân khúc Khách hàng
     with tabs[1]:
