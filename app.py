@@ -13,7 +13,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 st.set_page_config(page_title="Phân tích Hành vi Mua sắm", layout="wide", page_icon="📊", initial_sidebar_state="expanded")
 
 # Đọc file CSS từ bên ngoài
-with open("styles.css", "r") as f:
+with open("styles.css", "r", encoding="utf-8") as f:
     css = f.read()
 st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
