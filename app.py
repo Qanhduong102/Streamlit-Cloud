@@ -12,6 +12,12 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
+import os
+from google.oauth2 import service_account
+import gspread
+
+# Lấy thông tin từ biến môi trường
+credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
 # Tăng giới hạn số ô tối đa cho Pandas Styler
 pd.set_option("styler.render.max_elements", 998336)
@@ -74,385 +80,412 @@ elif st.session_state.get('authentication_status'):
     st.markdown(f'<div class="success-message">Chào mừng {name}!</div>', unsafe_allow_html=True)
     authenticator.logout("Đăng xuất", "sidebar")
 
-    # Tải dữ liệu từ file CSV cục bộ (thay thế Google Sheets)
+    # Tải dữ liệu (ưu tiên Google Sheets nếu có credentials, nếu không dùng file CSV)
     @st.cache_data
-    def load_data_from_csv():
-        df = pd.read_csv("purchase_data.csv")  # Thay bằng file CSV của bạn
-        df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
-        df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
-        df['Customer ID'] = df['Customer ID'].astype(int)
-        df['Returns'] = df['Returns'].astype(float)
-        df['Age'] = df['Age'].astype(int)
-        df['Churn'] = df['Churn'].astype(int)
-        df['Year'] = df['Year'].astype(int)
-        df['Month'] = df['Month'].astype(int)
-        customer_segments = pd.read_csv('customer_segments.csv')  # Giữ nguyên file này nếu có
+    def load_data():
+        if credentials_json:
+            try:
+                credentials_dict = json.loads(credentials_json)
+                credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+                gc = gspread.authorize(credentials)
+                sheet = gc.open("Purchase Data").sheet1  # Thay "Purchase Data" bằng tên Google Sheet của bạn
+                df = pd.DataFrame(sheet.get_all_records())
+                df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
+                df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
+                df['Customer ID'] = df['Customer ID'].astype(int)
+                df['Returns'] = df['Returns'].astype(float)
+                df['Age'] = df['Age'].astype(int)
+                df['Churn'] = df['Churn'].astype(int)
+                df['Year'] = df['Year'].astype(int)
+                df['Month'] = df['Month'].astype(int)
+
+                # Tải customer_segments từ Google Sheet khác (nếu có)
+                segment_sheet = gc.open("Customer Segments").sheet1  # Thay "Customer Segments" bằng tên Sheet
+                customer_segments = pd.DataFrame(segment_sheet.get_all_records())
+            except Exception as e:
+                st.error(f"Lỗi khi tải dữ liệu từ Google Sheets: {e}")
+                st.info("Sử dụng file CSV cục bộ thay thế.")
+                df = pd.read_csv("purchase_data.csv")
+                df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
+                df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
+                df['Customer ID'] = df['Customer ID'].astype(int)
+                df['Returns'] = df['Returns'].astype(float)
+                df['Age'] = df['Age'].astype(int)
+                df['Churn'] = df['Churn'].astype(int)
+                df['Year'] = df['Year'].astype(int)
+                df['Month'] = df['Month'].astype(int)
+                customer_segments = pd.read_csv('customer_segments.csv')
+        else:
+            # Nếu không có credentials, dùng file CSV cục bộ
+            df = pd.read_csv("purchase_data.csv")
+            df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
+            df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
+            df['Customer ID'] = df['Customer ID'].astype(int)
+            df['Returns'] = df['Returns'].astype(float)
+            df['Age'] = df['Age'].astype(int)
+            df['Churn'] = df['Churn'].astype(int)
+            df['Year'] = df['Year'].astype(int)
+            df['Month'] = df['Month'].astype(int)
+            customer_segments = pd.read_csv('customer_segments.csv')
         return df, customer_segments
 
     # Tải mô hình
     @st.cache_resource
     def load_models():
-        churn_model = joblib.load('churn_model.pkl')
-        scaler = joblib.load('scaler.pkl')
-        revenue_model = joblib.load('revenue_model.pkl')
-        return churn_model, scaler, revenue_model
+        try:
+            churn_model = joblib.load('churn_model.pkl')
+            scaler = joblib.load('scaler.pkl')
+            revenue_model = joblib.load('revenue_model.pkl')
+            return churn_model, scaler, revenue_model
+        except Exception as e:
+            st.error(f"Lỗi khi tải mô hình: {e}")
+            return None, None, None
 
-    df, customer_segments = load_data_from_csv()
+    df, customer_segments = load_data()
     churn_model, scaler, revenue_model = load_models()
 
-    # Header
-    st.title("📊 Hệ thống Phân tích Hành vi Mua sắm ")
-    st.markdown("**Khám phá dữ liệu, phân khúc khách hàng và dự đoán với giao diện tối ưu!**", unsafe_allow_html=True)
+    # Kiểm tra nếu mô hình hoặc dữ liệu không tải được
+    if not all([df is not None, customer_segments is not None, churn_model is not None, scaler is not None, revenue_model is not None]):
+        st.error("Không thể tải dữ liệu hoặc mô hình. Vui lòng kiểm tra file hoặc cấu hình.")
+    else:
+        # Header
+        st.title("📊 Hệ thống Phân tích Hành vi Mua sắm ")
+        st.markdown("**Khám phá dữ liệu, phân khúc khách hàng và dự đoán với giao diện tối ưu!**", unsafe_allow_html=True)
 
-    # Sidebar
-    with st.sidebar:
-        st.header("🔍 Bộ lọc Dữ liệu")
-        category_filter = st.multiselect("Danh mục sản phẩm", options=['Tất cả'] + sorted(df['Product Category'].unique()), default=['Tất cả'])
-        gender_filter = st.multiselect("Giới tính", options=['Tất cả'] + sorted(df['Gender'].unique()), default=['Tất cả'])
-        date_range = st.date_input("Phạm vi ngày", value=(df['Purchase Date'].min(), df['Purchase Date'].max()), 
-                                   min_value=df['Purchase Date'].min(), max_value=df['Purchase Date'].max())
-        st.markdown("---")
-        st.caption(f"Cập nhật lần cuối: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
+        # Sidebar
+        with st.sidebar:
+            st.header("🔍 Bộ lọc Dữ liệu")
+            category_filter = st.multiselect("Danh mục sản phẩm", options=['Tất cả'] + sorted(df['Product Category'].unique()), default=['Tất cả'])
+            gender_filter = st.multiselect("Giới tính", options=['Tất cả'] + sorted(df['Gender'].unique()), default=['Tất cả'])
+            date_range = st.date_input("Phạm vi ngày", value=(df['Purchase Date'].min(), df['Purchase Date'].max()), 
+                                    min_value=df['Purchase Date'].min(), max_value=df['Purchase Date'].max())
+            st.markdown("---")
+            st.caption(f"Cập nhật lần cuối: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
 
-    # Lọc dữ liệu
-    filtered_df = df.copy()
-    if 'Tất cả' not in category_filter:
-        filtered_df = filtered_df[filtered_df['Product Category'].isin(category_filter)]
-    if 'Tất cả' not in gender_filter:
-        filtered_df = filtered_df[filtered_df['Gender'].isin(gender_filter)]
-    filtered_df = filtered_df[(filtered_df['Purchase Date'] >= pd.to_datetime(date_range[0])) & 
-                              (filtered_df['Purchase Date'] <= pd.to_datetime(date_range[1]))]
+        # Lọc dữ liệu
+        filtered_df = df.copy()
+        if 'Tất cả' not in category_filter:
+            filtered_df = filtered_df[filtered_df['Product Category'].isin(category_filter)]
+        if 'Tất cả' not in gender_filter:
+            filtered_df = filtered_df[filtered_df['Gender'].isin(gender_filter)]
+        filtered_df = filtered_df[(filtered_df['Purchase Date'] >= pd.to_datetime(date_range[0])) & 
+                                (filtered_df['Purchase Date'] <= pd.to_datetime(date_range[1]))]
 
-    # Tổng quan
-    st.write(f"**Tổng quan dữ liệu lọc**: {len(filtered_df):,} giao dịch | Tổng doanh thu: {filtered_df['Total Purchase Amount'].sum():,.0f} VND")
+        # Tổng quan
+        st.write(f"**Tổng quan dữ liệu lọc**: {len(filtered_df):,} giao dịch | Tổng doanh thu: {filtered_df['Total Purchase Amount'].sum():,.0f} VND")
 
-    # Tabs
-    tabs = st.tabs(["📈 Phân tích Cơ bản", "👥 Phân khúc Khách hàng", "⚠️ Dự đoán Churn", "📅 Xu hướng Thời gian", 
-                    "👤 Chi tiết Khách hàng", "📦 Phân tích Hoàn trả"])
+        # Tabs
+        tabs = st.tabs(["📈 Phân tích Cơ bản", "👥 Phân khúc Khách hàng", "⚠️ Dự đoán Churn", "📅 Xu hướng Thời gian", 
+                        "👤 Chi tiết Khách hàng", "📦 Phân tích Hoàn trả"])
 
-    # Tab 1: Phân tích Cơ bản
-    with tabs[0]:
-        st.subheader("Phân tích Cơ bản")
-        col1, col2, col3 = st.columns([1, 1, 1], gap="small")
-    
-        with col1:
-            revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
-            fig1 = px.bar(revenue_by_category, x='Product Category', y='Total Purchase Amount', 
-                      title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
-            fig1.update_traces(textposition='outside')
-            st.plotly_chart(fig1, use_container_width=True)
-    
-        with col2:
-            revenue_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
-            fig2 = px.line(revenue_by_day, x='Purchase Date', y='Total Purchase Amount', 
-                       title="Doanh thu Theo Ngày", height=400, line_shape='spline')
-            st.plotly_chart(fig2, use_container_width=True)
-    
-        with col3:
-            top_spenders = filtered_df.groupby('Customer ID').agg({
-                'Total Purchase Amount': 'sum',
-                'Purchase Date': 'count',
-                'Product Category': lambda x: x.mode()[0]
-            }).nlargest(5, 'Total Purchase Amount').reset_index()
-            top_spenders.columns = ['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Favorite Category']
-            fig3 = px.bar(top_spenders, x='Customer ID', y='Total Purchase Amount', 
-                      title="Top 5 Khách hàng Chi tiêu Cao nhất", 
-                      text=top_spenders['Customer ID'].astype(str) + ' (' + top_spenders['Transaction Count'].astype(str) + ' GD)',
-                      color_discrete_sequence=['#ff6f61'], height=400)
-            fig3.update_traces(textposition='outside')
-            st.plotly_chart(fig3, use_container_width=True)
-    
-        # Bảng chi tiết Top 5 Khách hàng (di chuyển ra ngoài cột để full width)
-        st.subheader("Chi tiết Top 5 Khách hàng")
-        st.dataframe(top_spenders.style.format({
-            'Total Purchase Amount': '{:,.0f} VND',
-            'Transaction Count': '{:,}',
-        }), height=200, use_container_width=True)  # Tăng chiều cao và full width
-    
-        # Phân tích chi tiết danh mục theo ngày
-        st.subheader("Chi tiết Danh mục Theo Ngày")
-        selected_category = st.selectbox("Chọn danh mục để xem chi tiết:", 
-                                     options=['Tất cả'] + sorted(filtered_df['Product Category'].unique()),
-                                     index=0)
-    
-        if selected_category == 'Tất cả':
-            category_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
-        else:
-            category_by_day = filtered_df[filtered_df['Product Category'] == selected_category].groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
-    
-        fig_category_day = px.line(category_by_day, x='Purchase Date', y='Total Purchase Amount', 
-                               title=f"Doanh thu Theo Ngày của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", 
-                               height=400, line_shape='spline')
-        st.plotly_chart(fig_category_day, use_container_width=True)
-    
-        with st.expander(f"🔎 Xem dữ liệu chi tiết của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", expanded=False):
+        # Tab 1: Phân tích Cơ bản
+        with tabs[0]:
+            st.subheader("Phân tích Cơ bản")
+            col1, col2, col3 = st.columns([1, 1, 1], gap="small")
+        
+            with col1:
+                revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
+                fig1 = px.bar(revenue_by_category, x='Product Category', y='Total Purchase Amount', 
+                            title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
+                fig1.update_traces(textposition='outside')
+                st.plotly_chart(fig1, use_container_width=True)
+        
+            with col2:
+                revenue_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
+                fig2 = px.line(revenue_by_day, x='Purchase Date', y='Total Purchase Amount', 
+                            title="Doanh thu Theo Ngày", height=400, line_shape='spline')
+                st.plotly_chart(fig2, use_container_width=True)
+        
+            with col3:
+                top_spenders = filtered_df.groupby('Customer ID').agg({
+                    'Total Purchase Amount': 'sum',
+                    'Purchase Date': 'count',
+                    'Product Category': lambda x: x.mode()[0]
+                }).nlargest(5, 'Total Purchase Amount').reset_index()
+                top_spenders.columns = ['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Favorite Category']
+                fig3 = px.bar(top_spenders, x='Customer ID', y='Total Purchase Amount', 
+                            title="Top 5 Khách hàng Chi tiêu Cao nhất", 
+                            text=top_spenders['Customer ID'].astype(str) + ' (' + top_spenders['Transaction Count'].astype(str) + ' GD)',
+                            color_discrete_sequence=['#ff6f61'], height=400)
+                fig3.update_traces(textposition='outside')
+                st.plotly_chart(fig3, use_container_width=True)
+        
+            # Bảng chi tiết Top 5 Khách hàng
+            st.subheader("Chi tiết Top 5 Khách hàng")
+            st.dataframe(top_spenders.style.format({
+                'Total Purchase Amount': '{:,.0f} VND',
+                'Transaction Count': '{:,}',
+            }), height=200, use_container_width=True)
+        
+            # Phân tích chi tiết danh mục theo ngày
+            st.subheader("Chi tiết Danh mục Theo Ngày")
+            selected_category = st.selectbox("Chọn danh mục để xem chi tiết:", 
+                                          options=['Tất cả'] + sorted(filtered_df['Product Category'].unique()),
+                                          index=0)
+        
             if selected_category == 'Tất cả':
-                detailed_data = filtered_df.groupby(['Purchase Date', 'Product Category'])['Total Purchase Amount'].sum().unstack().fillna(0)
-                # Giới hạn dữ liệu nếu cần để tránh lỗi max_elements
-                limited_data = detailed_data.head(50)
-                st.write(f"**Hiển thị 50 ngày đầu tiên (tổng số ngày: {len(detailed_data)})**")
-                st.dataframe(limited_data.style.format('{:,.0f} VND'), height=400, use_container_width=True)
+                category_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
             else:
-                detailed_data = filtered_df[filtered_df['Product Category'] == selected_category].groupby('Purchase Date')['Total Purchase Amount'].sum().reset_index()
-                st.dataframe(detailed_data.style.format('{:,.0f} VND'), height=400, use_container_width=True)
-    
-        st.subheader("Gợi ý Hành động")
-        low_transaction_day = filtered_df.groupby('Day of Week')['Customer ID'].count().idxmin()
-        low_day_revenue = filtered_df.groupby('Day of Week')['Total Purchase Amount'].sum().min()
-        st.write(f"- Tăng khuyến mãi 15% vào {low_transaction_day} (doanh thu thấp nhất: {low_day_revenue:,.0f} VND) qua email hoặc SMS.")
-    
-        top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()
-        top_category_revenue = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().max()
-        st.write(f"- Đẩy mạnh quảng bá {top_category} (doanh thu: {top_category_revenue:,.0f} VND) qua mạng xã hội và banner trên website.")
-    
-        st.write("- **Chiến lược cho Top Khách hàng:**")
-        for vip in top_spenders['Customer ID']:
-            vip_data = filtered_df[filtered_df['Customer ID'] == vip]
-            last_purchase = vip_data['Purchase Date'].max()
-            fav_category = vip_data['Product Category'].mode()[0]
-            if (pd.Timestamp.now() - last_purchase).days > 30:
-                st.write(f"  - Khách hàng {vip}: Không hoạt động {(pd.Timestamp.now() - last_purchase).days} ngày. Gửi ưu đãi 20% cho {fav_category}.")
-            else:
-                st.write(f"  - Khách hàng {vip}: Duy trì hoạt động. Tặng điểm thưởng hoặc giảm giá 10% cho {fav_category} để khuyến khích mua tiếp.")
-
-    # Tab 2: Phân khúc Khách hàng
-    with tabs[1]:
-        st.subheader("Phân khúc Khách hàng")
-
-        # Bảng chi tiết các nhóm
-        with st.expander("🔎 Chi tiết các nhóm khách hàng", expanded=False):
-            cluster_summary = customer_segments.groupby('Cluster').agg({
-                'Total Purchase Amount': 'mean',
-                'Transaction Count': 'mean',
-                'Returns': 'mean',
-                'Age': 'mean',
-                'Customer ID': 'count'
-            }).rename(columns={
-                'Total Purchase Amount': 'Chi tiêu TB (VND)',
-                'Transaction Count': 'Tần suất GD TB',
-                'Returns': 'Tỷ lệ Hoàn trả TB',
-                'Age': 'Độ tuổi TB',
-                'Customer ID': 'Số lượng KH'
-            })
-            st.dataframe(cluster_summary.style.format({
-                'Chi tiêu TB (VND)': '{:,.0f}',
-                'Tần suất GD TB': '{:.2f}',
-                'Tỷ lệ Hoàn trả TB': '{:.2%}',
-                'Độ tuổi TB': '{:.1f}',
-                'Số lượng KH': '{:,}'
-            }).background_gradient(cmap='Blues'))
-
-        # Biểu đồ chi tiêu trung bình
-        avg_spending = customer_segments.groupby('Cluster')['Total Purchase Amount'].mean().reset_index()
-        fig4 = px.bar(avg_spending, x='Cluster', y='Total Purchase Amount', 
-                    title="Chi tiêu Trung bình theo Nhóm", color='Cluster', 
-                     text=avg_spending['Total Purchase Amount'].round(2), height=400)
-        fig4.update_traces(textposition='outside')
-        st.plotly_chart(fig4, use_container_width=True)
-
-        # So sánh doanh thu và tỷ lệ hoàn trả
-        cluster_compare = customer_segments.groupby('Cluster').agg({
-            'Total Purchase Amount': 'mean',
-            'Returns': 'mean'
-        }).reset_index()
-        cluster_compare['Returns'] = cluster_compare['Returns'] * 100
-        fig_compare = px.scatter(cluster_compare, x='Total Purchase Amount', y='Returns', 
-                             color='Cluster', size='Total Purchase Amount',
-                             title="So sánh Chi tiêu TB và Tỷ lệ Hoàn trả",
-                             labels={'Total Purchase Amount': 'Chi tiêu TB (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
-                             height=400)
-        st.plotly_chart(fig_compare, use_container_width=True)
-
-        # Xu hướng chi tiêu theo thời gian
-        df_with_clusters = filtered_df.merge(customer_segments[['Customer ID', 'Cluster']], on='Customer ID', how='left')
-        cluster_trends = df_with_clusters.groupby(['Cluster', df_with_clusters['Purchase Date'].dt.to_period('M')])['Total Purchase Amount'].sum().reset_index()
-        cluster_trends['Purchase Date'] = cluster_trends['Purchase Date'].astype(str)
-        fig_trends = px.line(cluster_trends, x='Purchase Date', y='Total Purchase Amount', color='Cluster',
-                         title="Xu hướng Chi tiêu Theo Tháng của Các Nhóm", height=400, line_shape='spline')
-        st.plotly_chart(fig_trends, use_container_width=True)
-
-        # Gợi ý hành động
-        st.subheader("Gợi ý Hành động Theo Nhóm")
-        for cluster in cluster_summary.index:
-            spending = cluster_summary.loc[cluster, 'Chi tiêu TB (VND)']
-            frequency = cluster_summary.loc[cluster, 'Tần suất GD TB']
-            returns = cluster_summary.loc[cluster, 'Tỷ lệ Hoàn trả TB']
-            st.write(f"**Nhóm {cluster}:**")
-            if spending > cluster_summary['Chi tiêu TB (VND)'].mean() and frequency < cluster_summary['Tần suất GD TB'].mean():
-                st.write(f"- Chi tiêu cao nhưng ít giao dịch: Tặng mã giảm giá định kỳ để tăng tần suất mua sắm.")
-            elif returns > cluster_summary['Tỷ lệ Hoàn trả TB'].mean():
-                st.write(f"- Tỷ lệ hoàn trả cao: Cải thiện chất lượng sản phẩm hoặc kiểm tra chính sách đổi trả.")
-            else:
-                st.write(f"- Nhóm ổn định: Duy trì chính sách hiện tại hoặc thử nghiệm ưu đãi nhỏ.")
-
-        # Tính tương tác
-        selected_cluster = st.selectbox("Chọn nhóm để xem chi tiết:", options=cluster_summary.index)
-        cluster_data = customer_segments[customer_segments['Cluster'] == selected_cluster]
-        st.write(f"**Thông tin chi tiết Nhóm {selected_cluster}:**")
-        st.dataframe(cluster_data[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-        cluster_purchases = filtered_df[filtered_df['Customer ID'].isin(cluster_data['Customer ID'])]
-        fav_categories = cluster_purchases.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
-        fig_fav = px.pie(fav_categories, values='Total Purchase Amount', names='Product Category',
-                     title=f"Danh mục Yêu thích của Nhóm {selected_cluster}", height=400)
-        st.plotly_chart(fig_fav, use_container_width=True)
-
-    # Tab 3: Dự đoán Churn
-    with tabs[2]:
-        st.subheader("Dự đoán Khách hàng Rời bỏ")
-
-    # Dự đoán cho một khách hàng cụ thể
-    col1, col2 = st.columns([3, 1], vertical_alignment="center")
-    with col1:
-        customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d", key="customer_id_input")
-    with col2:
-        predict_button = st.button("Dự đoán", key="predict_button", use_container_width=True)
-    
-    if predict_button:
-        customer_data = customer_segments[customer_segments['Customer ID'] == customer_id]
-        if not customer_data.empty:
-            X = scaler.transform(customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-            churn_pred = churn_model.predict(X)[0]
-            if hasattr(churn_model, 'predict_proba'):
-                churn_prob = churn_model.predict_proba(X)[0][1] * 100
-                st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'} (Xác suất: {churn_prob:.2f}%)", icon="✅")
-            else:
-                st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'}", icon="✅")
-            
-            if churn_pred:
-                st.write("**Nguyên nhân tiềm năng:**")
-                if customer_data['Transaction Count'].iloc[0] < customer_segments['Transaction Count'].mean():
-                    st.write("- Tần suất giao dịch thấp hơn trung bình.")
-                if customer_data['Returns'].iloc[0] > customer_segments['Returns'].mean():
-                    st.write("- Tỷ lệ hoàn trả cao hơn trung bình.")
-                if customer_data['Total Purchase Amount'].iloc[0] < customer_segments['Total Purchase Amount'].mean():
-                    st.write("- Chi tiêu thấp hơn trung bình.")
-                
-                customer_filtered = filtered_df[filtered_df['Customer ID'] == customer_id]
-                last_purchase = customer_filtered['Purchase Date'].max()
-                fav_category = customer_filtered['Product Category'].mode()[0]
-                days_inactive = (pd.Timestamp.now() - last_purchase).days
-                avg_spending = customer_data['Total Purchase Amount'].mean()
-                potential_loss = avg_spending * 12
-                
-                st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} VND (ước tính trong 12 tháng).")
-                st.write("**Gợi ý chi tiết:**")
-                if days_inactive > 30:
-                    st.write(f"- Khách hàng không mua {days_inactive} ngày. Gửi email ưu đãi 20% cho {fav_category}.")
+                category_by_day = filtered_df[filtered_df['Product Category'] == selected_category].groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
+        
+            fig_category_day = px.line(category_by_day, x='Purchase Date', y='Total Purchase Amount', 
+                                    title=f"Doanh thu Theo Ngày của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", 
+                                    height=400, line_shape='spline')
+            st.plotly_chart(fig_category_day, use_container_width=True)
+        
+            with st.expander(f"🔎 Xem dữ liệu chi tiết của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", expanded=False):
+                if selected_category == 'Tất cả':
+                    detailed_data = filtered_df.groupby(['Purchase Date', 'Product Category'])['Total Purchase Amount'].sum().unstack().fillna(0)
+                    limited_data = detailed_data.head(50)
+                    st.write(f"**Hiển thị 50 ngày đầu tiên (tổng số ngày: {len(detailed_data)})**")
+                    st.dataframe(limited_data.style.format('{:,.0f} VND'), height=400, use_container_width=True)
                 else:
-                    st.write(f"- Tặng mã giảm giá 10% cho {fav_category} để khuyến khích giao dịch tiếp theo.")
-        else:
-            st.error(f"Không tìm thấy khách hàng {customer_id}!", icon="❌")
+                    detailed_data = filtered_df[filtered_df['Product Category'] == selected_category].groupby('Purchase Date')['Total Purchase Amount'].sum().reset_index()
+                    st.dataframe(detailed_data.style.format('{:,.0f} VND'), height=400, use_container_width=True)
+        
+            st.subheader("Gợi ý Hành động")
+            low_transaction_day = filtered_df.groupby('Day of Week')['Customer ID'].count().idxmin()
+            low_day_revenue = filtered_df.groupby('Day of Week')['Total Purchase Amount'].sum().min()
+            st.write(f"- Tăng khuyến mãi 15% vào {low_transaction_day} (doanh thu thấp nhất: {low_day_revenue:,.0f} VND) qua email hoặc SMS.")
+        
+            top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()
+            top_category_revenue = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().max()
+            st.write(f"- Đẩy mạnh quảng bá {top_category} (doanh thu: {top_category_revenue:,.0f} VND) qua mạng xã hội và banner trên website.")
+        
+            st.write("- **Chiến lược cho Top Khách hàng:**")
+            for vip in top_spenders['Customer ID']:
+                vip_data = filtered_df[filtered_df['Customer ID'] == vip]
+                last_purchase = vip_data['Purchase Date'].max()
+                fav_category = vip_data['Product Category'].mode()[0]
+                if (pd.Timestamp.now() - last_purchase).days > 30:
+                    st.write(f"  - Khách hàng {vip}: Không hoạt động {(pd.Timestamp.now() - last_purchase).days} ngày. Gửi ưu đãi 20% cho {fav_category}.")
+                else:
+                    st.write(f"  - Khách hàng {vip}: Duy trì hoạt động. Tặng điểm thưởng hoặc giảm giá 10% cho {fav_category} để khuyến khích mua tiếp.")
 
-    # Top 10 khách hàng có nguy cơ churn cao
-        st.markdown("---")
-        st.write("**Top 10 Khách hàng có nguy cơ rời bỏ cao nhất**")
-        X_all = scaler.transform(customer_segments[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-        if hasattr(churn_model, 'predict_proba'):
-            churn_probs = churn_model.predict_proba(X_all)[:, 1]
-            customer_segments['Churn Probability'] = churn_probs * 100
-            top_churn = customer_segments.sort_values('Churn Probability', ascending=False).head(10)
-            st.dataframe(top_churn[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
-                     .style.format({'Churn Probability': '{:.2f}%', 'Total Purchase Amount': '{:,.0f}'}), height=300)
-        else:
-            churn_preds = churn_model.predict(X_all)
-            customer_segments['Churn Prediction'] = churn_preds
-            top_churn = customer_segments[customer_segments['Churn Prediction'] == 1].head(10)
-            st.dataframe(top_churn[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']], height=300)
+        # Tab 2: Phân khúc Khách hàng
+        with tabs[1]:
+            st.subheader("Phân khúc Khách hàng")
 
-        # Xu hướng churn theo thời gian
-        st.markdown("---")
-        st.write("**Xu hướng Nguy cơ Churn Theo Thời gian**")
-        df_with_churn = filtered_df.merge(customer_segments[['Customer ID', 'Churn Probability']], on='Customer ID', how='left')
-        churn_trend = df_with_churn.groupby(df_with_churn['Purchase Date'].dt.to_period('M'))['Churn Probability'].mean().reset_index()
-        churn_trend['Purchase Date'] = churn_trend['Purchase Date'].astype(str)
-        fig_churn_trend = px.line(churn_trend, x='Purchase Date', y='Churn Probability', 
-                              title="Nguy cơ Churn Trung bình Theo Tháng", height=400, line_shape='spline')
-        st.plotly_chart(fig_churn_trend, use_container_width=True)
+            with st.expander("🔎 Chi tiết các nhóm khách hàng", expanded=False):
+                cluster_summary = customer_segments.groupby('Cluster').agg({
+                    'Total Purchase Amount': 'mean',
+                    'Transaction Count': 'mean',
+                    'Returns': 'mean',
+                    'Age': 'mean',
+                    'Customer ID': 'count'
+                }).rename(columns={
+                    'Total Purchase Amount': 'Chi tiêu TB (VND)',
+                    'Transaction Count': 'Tần suất GD TB',
+                    'Returns': 'Tỷ lệ Hoàn trả TB',
+                    'Age': 'Độ tuổi TB',
+                    'Customer ID': 'Số lượng KH'
+                })
+                st.dataframe(cluster_summary.style.format({
+                    'Chi tiêu TB (VND)': '{:,.0f}',
+                    'Tần suất GD TB': '{:.2f}',
+                    'Tỷ lệ Hoàn trả TB': '{:.2%}',
+                    'Độ tuổi TB': '{:.1f}',
+                    'Số lượng KH': '{:,}'
+                }).background_gradient(cmap='Blues'))
 
-        # Nguy cơ churn theo phân khúc
-        st.markdown("---")
-        st.write("**Nguy cơ Churn Theo Phân khúc Khách hàng**")
-        churn_by_cluster = customer_segments.groupby('Cluster')['Churn Probability'].mean().reset_index()
-        fig_churn_cluster = px.bar(churn_by_cluster, x='Cluster', y='Churn Probability', 
-                               title="Nguy cơ Churn Trung bình Theo Nhóm", color='Cluster',
-                               text=churn_by_cluster['Churn Probability'].apply(lambda x: f"{x:.2f}%"), height=400)
-        fig_churn_cluster.update_traces(textposition='outside')
-        st.plotly_chart(fig_churn_cluster, use_container_width=True)
+            avg_spending = customer_segments.groupby('Cluster')['Total Purchase Amount'].mean().reset_index()
+            fig4 = px.bar(avg_spending, x='Cluster', y='Total Purchase Amount', 
+                        title="Chi tiêu Trung bình theo Nhóm", color='Cluster', 
+                        text=avg_spending['Total Purchase Amount'].round(2), height=400)
+            fig4.update_traces(textposition='outside')
+            st.plotly_chart(fig4, use_container_width=True)
 
-    # Tab 4: Xu hướng Thời gian
-    with tabs[3]:
-        st.subheader("Xu hướng Theo Thời gian")
+            cluster_compare = customer_segments.groupby('Cluster').agg({
+                'Total Purchase Amount': 'mean',
+                'Returns': 'mean'
+            }).reset_index()
+            cluster_compare['Returns'] = cluster_compare['Returns'] * 100
+            fig_compare = px.scatter(cluster_compare, x='Total Purchase Amount', y='Returns', 
+                                 color='Cluster', size='Total Purchase Amount',
+                                 title="So sánh Chi tiêu TB và Tỷ lệ Hoàn trả",
+                                 labels={'Total Purchase Amount': 'Chi tiêu TB (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
+                                 height=400)
+            st.plotly_chart(fig_compare, use_container_width=True)
 
-        # Phân tích theo giờ (giả sử Purchase Date có định dạng datetime đầy đủ)
-        if 'Purchase Date' in filtered_df.columns and filtered_df['Purchase Date'].dt.hour.notnull().any():
-            hourly_trends = filtered_df.groupby(filtered_df['Purchase Date'].dt.hour)['Total Purchase Amount'].sum().reset_index()
-            hourly_trends.columns = ['Hour', 'Total Purchase Amount']
-            fig_hourly = px.bar(hourly_trends, x='Hour', y='Total Purchase Amount', 
-                            title="Doanh thu Theo Giờ trong Ngày", 
-                            text=hourly_trends['Total Purchase Amount'].apply(lambda x: f"{x:,.0f}"), 
-                            height=400)
-            fig_hourly.update_traces(textposition='outside')
-            st.plotly_chart(fig_hourly, use_container_width=True)
-        else:
-            st.warning("Dữ liệu không chứa thông tin giờ chi tiết để phân tích theo giờ.")
+            df_with_clusters = filtered_df.merge(customer_segments[['Customer ID', 'Cluster']], on='Customer ID', how='left')
+            cluster_trends = df_with_clusters.groupby(['Cluster', df_with_clusters['Purchase Date'].dt.to_period('M')])['Total Purchase Amount'].sum().reset_index()
+            cluster_trends['Purchase Date'] = cluster_trends['Purchase Date'].astype(str)
+            fig_trends = px.line(cluster_trends, x='Purchase Date', y='Total Purchase Amount', color='Cluster',
+                              title="Xu hướng Chi tiêu Theo Tháng của Các Nhóm", height=400, line_shape='spline')
+            st.plotly_chart(fig_trends, use_container_width=True)
 
-        # Phân tích hiện tại (doanh thu theo tháng)
-        monthly_revenue = filtered_df.groupby(filtered_df['Purchase Date'].dt.to_period('M'))['Total Purchase Amount'].sum().reset_index()
-        monthly_revenue['Month_Num'] = np.arange(len(monthly_revenue))
-        monthly_revenue['Purchase Date'] = monthly_revenue['Purchase Date'].astype(str)
-        fig5 = px.line(monthly_revenue, x='Purchase Date', y='Total Purchase Amount', 
-                   title="Doanh thu Theo Tháng", height=400, line_shape='spline')
-        st.plotly_chart(fig5, use_container_width=True)
+            st.subheader("Gợi ý Hành động Theo Nhóm")
+            for cluster in cluster_summary.index:
+                spending = cluster_summary.loc[cluster, 'Chi tiêu TB (VND)']
+                frequency = cluster_summary.loc[cluster, 'Tần suất GD TB']
+                returns = cluster_summary.loc[cluster, 'Tỷ lệ Hoàn trả TB']
+                st.write(f"**Nhóm {cluster}:**")
+                if spending > cluster_summary['Chi tiêu TB (VND)'].mean() and frequency < cluster_summary['Tần suất GD TB'].mean():
+                    st.write(f"- Chi tiêu cao nhưng ít giao dịch: Tặng mã giảm giá định kỳ để tăng tần suất mua sắm.")
+                elif returns > cluster_summary['Tỷ lệ Hoàn trả TB'].mean():
+                    st.write(f"- Tỷ lệ hoàn trả cao: Cải thiện chất lượng sản phẩm hoặc kiểm tra chính sách đổi trả.")
+                else:
+                    st.write(f"- Nhóm ổn định: Duy trì chính sách hiện tại hoặc thử nghiệm ưu đãi nhỏ.")
 
-        # Phân tích theo quý
-        quarterly_trends = filtered_df.groupby(filtered_df['Purchase Date'].dt.to_period('Q'))['Total Purchase Amount'].sum().reset_index()
-        quarterly_trends['Purchase Date'] = quarterly_trends['Purchase Date'].astype(str)
-        fig_quarterly = px.bar(quarterly_trends, x='Purchase Date', y='Total Purchase Amount', 
-                           title="Doanh thu Theo Quý", 
-                           text=quarterly_trends['Total Purchase Amount'].apply(lambda x: f"{x:,.0f}"), 
-                           height=400)
-        fig_quarterly.update_traces(textposition='outside')
-        st.plotly_chart(fig_quarterly, use_container_width=True)
+            selected_cluster = st.selectbox("Chọn nhóm để xem chi tiết:", options=cluster_summary.index)
+            cluster_data = customer_segments[customer_segments['Cluster'] == selected_cluster]
+            st.write(f"**Thông tin chi tiết Nhóm {selected_cluster}:**")
+            st.dataframe(cluster_data[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
+            cluster_purchases = filtered_df[filtered_df['Customer ID'].isin(cluster_data['Customer ID'])]
+            fav_categories = cluster_purchases.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
+            fig_fav = px.pie(fav_categories, values='Total Purchase Amount', names='Product Category',
+                          title=f"Danh mục Yêu thích của Nhóm {selected_cluster}", height=400)
+            st.plotly_chart(fig_fav, use_container_width=True)
 
-    # Tab 5: Chi tiết Khách hàng
-    with tabs[4]:
-        st.subheader("Chi tiết Khách hàng")
-        customer_id = st.number_input("Nhập Customer ID để xem chi tiết:", min_value=1, step=1)
-        customer_data = filtered_df[filtered_df['Customer ID'] == customer_id]
-        if not customer_data.empty:
-            st.write(f"Tổng chi tiêu: {customer_data['Total Purchase Amount'].sum():,.0f} VND")
-            st.dataframe(customer_data[['Purchase Date', 'Product Category', 'Total Purchase Amount', 'Returns']])
-            fig = px.line(customer_data, x='Purchase Date', y='Total Purchase Amount', 
-                          title=f"Lịch sử mua sắm của {customer_id}", height=400)
-            st.plotly_chart(fig)
-        else:
-            st.warning("Không tìm thấy khách hàng này!")
+        # Tab 3: Dự đoán Churn
+        with tabs[2]:
+            st.subheader("Dự đoán Khách hàng Rời bỏ")
 
-    # Tab 6: Phân tích Hoàn trả
-    with tabs[5]:
-        st.subheader("Phân tích Hoàn trả")
-        return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
-        fig6 = px.bar(return_rate, x='Product Category', y='Returns', 
-                      title="Tỷ lệ Hoàn trả theo Danh mục", text_auto='.2%', height=400)
-        fig6.update_traces(textposition='outside')
-        st.plotly_chart(fig6, use_container_width=True)
-        # Biểu đồ tỷ lệ hoàn trả hiện tại
-        return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
-        fig6 = px.bar(return_rate, x='Product Category', y='Returns', 
-                  title="Tỷ lệ Hoàn trả theo Danh mục", text_auto='.2%', height=400)
-        fig6.update_traces(textposition='outside')
-        st.plotly_chart(fig6, use_container_width=True)
+            col1, col2 = st.columns([3, 1], vertical_alignment="center")
+            with col1:
+                customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d", key="customer_id_input")
+            with col2:
+                predict_button = st.button("Dự đoán", key="predict_button", use_container_width=True)
+        
+            if predict_button:
+                customer_data = customer_segments[customer_segments['Customer ID'] == customer_id]
+                if not customer_data.empty:
+                    X = scaler.transform(customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
+                    churn_pred = churn_model.predict(X)[0]
+                    if hasattr(churn_model, 'predict_proba'):
+                        churn_prob = churn_model.predict_proba(X)[0][1] * 100
+                        st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'} (Xác suất: {churn_prob:.2f}%)", icon="✅")
+                    else:
+                        st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'}", icon="✅")
+                
+                    if churn_pred:
+                        st.write("**Nguyên nhân tiềm năng:**")
+                        if customer_data['Transaction Count'].iloc[0] < customer_segments['Transaction Count'].mean():
+                            st.write("- Tần suất giao dịch thấp hơn trung bình.")
+                        if customer_data['Returns'].iloc[0] > customer_segments['Returns'].mean():
+                            st.write("- Tỷ lệ hoàn trả cao hơn trung bình.")
+                        if customer_data['Total Purchase Amount'].iloc[0] < customer_segments['Total Purchase Amount'].mean():
+                            st.write("- Chi tiêu thấp hơn trung bình.")
+                    
+                        customer_filtered = filtered_df[filtered_df['Customer ID'] == customer_id]
+                        last_purchase = customer_filtered['Purchase Date'].max()
+                        fav_category = customer_filtered['Product Category'].mode()[0]
+                        days_inactive = (pd.Timestamp.now() - last_purchase).days
+                        avg_spending = customer_data['Total Purchase Amount'].mean()
+                        potential_loss = avg_spending * 12
+                
+                        st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} VND (ước tính trong 12 tháng).")
+                        st.write("**Gợi ý chi tiết:**")
+                        if days_inactive > 30:
+                            st.write(f"- Khách hàng không mua {days_inactive} ngày. Gửi email ưu đãi 20% cho {fav_category}.")
+                        else:
+                            st.write(f"- Tặng mã giảm giá 10% cho {fav_category} để khuyến khích giao dịch tiếp theo.")
+                else:
+                    st.error(f"Không tìm thấy khách hàng {customer_id}!", icon="❌")
 
-        # Thêm biểu đồ so sánh tỷ lệ hoàn trả và doanh thu
-        return_vs_revenue = filtered_df.groupby('Product Category').agg({'Returns': 'mean', 'Total Purchase Amount': 'sum'}).reset_index()
-        return_vs_revenue['Returns'] = return_vs_revenue['Returns'] * 100  # Chuyển sang phần trăm
-        fig_compare = px.scatter(return_vs_revenue, x='Total Purchase Amount', y='Returns', 
-                             color='Product Category', size='Total Purchase Amount',
-                             title="Tỷ lệ Hoàn trả so với Doanh thu",
-                             labels={'Total Purchase Amount': 'Doanh thu (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
-                             height=400)
-        st.plotly_chart(fig_compare, use_container_width=True)
-        st.write("**Gợi ý**: Danh mục có doanh thu cao nhưng tỷ lệ hoàn trả lớn cần cải thiện chất lượng sản phẩm.")
+                st.markdown("---")
+                st.write("**Top 10 Khách hàng có nguy cơ rời bỏ cao nhất**")
+                X_all = scaler.transform(customer_segments[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
+                if hasattr(churn_model, 'predict_proba'):
+                    churn_probs = churn_model.predict_proba(X_all)[:, 1]
+                    customer_segments['Churn Probability'] = churn_probs * 100
+                    top_churn = customer_segments.sort_values('Churn Probability', ascending=False).head(10)
+                    st.dataframe(top_churn[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
+                             .style.format({'Churn Probability': '{:.2f}%', 'Total Purchase Amount': '{:,.0f}'}), height=300)
+                else:
+                    churn_preds = churn_model.predict(X_all)
+                    customer_segments['Churn Prediction'] = churn_preds
+                    top_churn = customer_segments[customer_segments['Churn Prediction'] == 1].head(10)
+                    st.dataframe(top_churn[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']], height=300)
+
+                st.markdown("---")
+                st.write("**Xu hướng Nguy cơ Churn Theo Thời gian**")
+                df_with_churn = filtered_df.merge(customer_segments[['Customer ID', 'Churn Probability']], on='Customer ID', how='left')
+                churn_trend = df_with_churn.groupby(df_with_churn['Purchase Date'].dt.to_period('M'))['Churn Probability'].mean().reset_index()
+                churn_trend['Purchase Date'] = churn_trend['Purchase Date'].astype(str)
+                fig_churn_trend = px.line(churn_trend, x='Purchase Date', y='Churn Probability', 
+                                      title="Nguy cơ Churn Trung bình Theo Tháng", height=400, line_shape='spline')
+                st.plotly_chart(fig_churn_trend, use_container_width=True)
+
+                st.markdown("---")
+                st.write("**Nguy cơ Churn Theo Phân khúc Khách hàng**")
+                churn_by_cluster = customer_segments.groupby('Cluster')['Churn Probability'].mean().reset_index()
+                fig_churn_cluster = px.bar(churn_by_cluster, x='Cluster', y='Churn Probability', 
+                                       title="Nguy cơ Churn Trung bình Theo Nhóm", color='Cluster',
+                                       text=churn_by_cluster['Churn Probability'].apply(lambda x: f"{x:.2f}%"), height=400)
+                fig_churn_cluster.update_traces(textposition='outside')
+                st.plotly_chart(fig_churn_cluster, use_container_width=True)
+
+        # Tab 4: Xu hướng Thời gian
+        with tabs[3]:
+            st.subheader("Xu hướng Theo Thời gian")
+
+            if 'Purchase Date' in filtered_df.columns and filtered_df['Purchase Date'].dt.hour.notnull().any():
+                hourly_trends = filtered_df.groupby(filtered_df['Purchase Date'].dt.hour)['Total Purchase Amount'].sum().reset_index()
+                hourly_trends.columns = ['Hour', 'Total Purchase Amount']
+                fig_hourly = px.bar(hourly_trends, x='Hour', y='Total Purchase Amount', 
+                                title="Doanh thu Theo Giờ trong Ngày", 
+                                text=hourly_trends['Total Purchase Amount'].apply(lambda x: f"{x:,.0f}"), 
+                                height=400)
+                fig_hourly.update_traces(textposition='outside')
+                st.plotly_chart(fig_hourly, use_container_width=True)
+            else:
+                st.warning("Dữ liệu không chứa thông tin giờ chi tiết để phân tích theo giờ.")
+
+            monthly_revenue = filtered_df.groupby(filtered_df['Purchase Date'].dt.to_period('M'))['Total Purchase Amount'].sum().reset_index()
+            monthly_revenue['Month_Num'] = np.arange(len(monthly_revenue))
+            monthly_revenue['Purchase Date'] = monthly_revenue['Purchase Date'].astype(str)
+            fig5 = px.line(monthly_revenue, x='Purchase Date', y='Total Purchase Amount', 
+                        title="Doanh thu Theo Tháng", height=400, line_shape='spline')
+            st.plotly_chart(fig5, use_container_width=True)
+
+            quarterly_trends = filtered_df.groupby(filtered_df['Purchase Date'].dt.to_period('Q'))['Total Purchase Amount'].sum().reset_index()
+            quarterly_trends['Purchase Date'] = quarterly_trends['Purchase Date'].astype(str)
+            fig_quarterly = px.bar(quarterly_trends, x='Purchase Date', y='Total Purchase Amount', 
+                                title="Doanh thu Theo Quý", 
+                                text=quarterly_trends['Total Purchase Amount'].apply(lambda x: f"{x:,.0f}"), 
+                                height=400)
+            fig_quarterly.update_traces(textposition='outside')
+            st.plotly_chart(fig_quarterly, use_container_width=True)
+
+        # Tab 5: Chi tiết Khách hàng
+        with tabs[4]:
+            st.subheader("Chi tiết Khách hàng")
+            customer_id = st.number_input("Nhập Customer ID để xem chi tiết:", min_value=1, step=1)
+            customer_data = filtered_df[filtered_df['Customer ID'] == customer_id]
+            if not customer_data.empty:
+                st.write(f"Tổng chi tiêu: {customer_data['Total Purchase Amount'].sum():,.0f} VND")
+                st.dataframe(customer_data[['Purchase Date', 'Product Category', 'Total Purchase Amount', 'Returns']])
+                fig = px.line(customer_data, x='Purchase Date', y='Total Purchase Amount', 
+                            title=f"Lịch sử mua sắm của {customer_id}", height=400)
+                st.plotly_chart(fig)
+            else:
+                st.warning("Không tìm thấy khách hàng này!")
+
+        # Tab 6: Phân tích Hoàn trả
+        with tabs[5]:
+            st.subheader("Phân tích Hoàn trả")
+            return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
+            fig6 = px.bar(return_rate, x='Product Category', y='Returns', 
+                        title="Tỷ lệ Hoàn trả theo Danh mục", text_auto='.2%', height=400)
+            fig6.update_traces(textposition='outside')
+            st.plotly_chart(fig6, use_container_width=True)
+
+            return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
+            fig6 = px.bar(return_rate, x='Product Category', y='Returns', 
+                        title="Tỷ lệ Hoàn trả theo Danh mục", text_auto='.2%', height=400)
+            fig6.update_traces(textposition='outside')
+            st.plotly_chart(fig6, use_container_width=True)
+
+            return_vs_revenue = filtered_df.groupby('Product Category').agg({'Returns': 'mean', 'Total Purchase Amount': 'sum'}).reset_index()
+            return_vs_revenue['Returns'] = return_vs_revenue['Returns'] * 100
+            fig_compare = px.scatter(return_vs_revenue, x='Total Purchase Amount', y='Returns', 
+                                 color='Product Category', size='Total Purchase Amount',
+                                 title="Tỷ lệ Hoàn trả so với Doanh thu",
+                                 labels={'Total Purchase Amount': 'Doanh thu (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
+                                 height=400)
+            st.plotly_chart(fig_compare, use_container_width=True)
+            st.write("**Gợi ý**: Danh mục có doanh thu cao nhưng tỷ lệ hoàn trả lớn cần cải thiện chất lượng sản phẩm.")
 
     def generate_pdf():
         buffer = BytesIO()
@@ -622,7 +655,7 @@ elif st.session_state.get('authentication_status'):
         if st.button("📥 Xuất Báo cáo PDF", key="export", use_container_width=True):
             pdf_buffer = generate_pdf()
             st.download_button(label="Tải Báo cáo PDF", data=pdf_buffer, file_name="purchase_analysis_report.pdf", 
-                               mime="application/pdf", use_container_width=True)
+                            mime="application/pdf", use_container_width=True)
             st.success("Báo cáo đã sẵn sàng để tải!", icon="📄")
 
     # Footer
@@ -659,3 +692,5 @@ elif st.session_state.get('authentication_status') is False:
     st.error("Tên người dùng hoặc mật khẩu không đúng!")
 elif st.session_state.get('authentication_status') is None:
     st.warning("Vui lòng nhập tên người dùng và mật khẩu.")
+
+import json  # Đảm bảo import json để parse credentials_json
