@@ -12,100 +12,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 # Cấu hình trang
 st.set_page_config(page_title="Phân tích Hành vi Mua sắm", layout="wide", page_icon="📊", initial_sidebar_state="expanded")
 
-# CSS tùy chỉnh
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap');
-
-    .main {background-color: #f5f7fa;}
-    .stSidebar {background-color: #e8eef3;}
-    .stButton>button {background-color: #2e7bcf; color: white; border-radius: 5px; height: 38px; padding: 0 15px;}
-    .stButton>button:hover {background-color: #1e5b9f;}
-    h1 {color: #2e7bcf; font-family: 'Arial', sans-serif;}
-    .stTab {background-color: #ffffff; border-radius: 10px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
-
-    /* Điều chỉnh căn chỉnh cho tab Dự đoán Churn */
-    .predict-container .stNumberInput > div > input {
-        height: 38px !important; /* Đảm bảo chiều cao của input bằng nút */
-        padding: 6px 12px !important;
-        vertical-align: middle;
-    }
-    .predict-container .stButton {
-        margin-top: 0 !important; /* Loại bỏ margin trên của nút */
-        vertical-align: middle;
-    }
-
-    /* Footer thiết kế lại */
-    .footer {
-        background: linear-gradient(180deg, #1a2a44, #2e3b55); /* Gradient tối sang trọng */
-        color: #d1d5db;
-        padding: 40px 20px;
-        font-family: 'Montserrat', sans-serif;
-        font-size: 14px;
-        line-height: 1.6;
-        border-top: 4px solid #2e7bcf; /* Đường viền trên màu xanh */
-    }
-    .footer-container {
-        max-width: 1200px;
-        margin: 0 auto;
-        display: flex;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 20px;
-    }
-    .footer-column {
-        flex: 1;
-        min-width: 200px;
-        margin-bottom: 20px;
-    }
-    .footer-column h4 {
-        color: #ffffff;
-        font-size: 16px;
-        font-weight: 600;
-        margin-bottom: 15px;
-        border-bottom: 2px solid #2e7bcf;
-        padding-bottom: 5px;
-    }
-    .footer-column p, .footer-column a {
-        color: #d1d5db;
-        text-decoration: none;
-        margin: 5px 0;
-        display: block;
-    }
-    .footer-column a:hover {
-        color: #2e7bcf; /* Màu xanh khi hover */
-        transition: color 0.3s ease;
-    }
-    .footer-column .social-icons a {
-        font-size: 18px;
-        margin-right: 10px;
-        color: #d1d5db;
-    }
-    .footer-column .social-icons a:hover {
-        color: #2e7bcf;
-    }
-    .footer-bottom {
-        text-align: center;
-        padding-top: 20px;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        margin-top: 20px;
-        color: #a0a5b0;
-        font-size: 13px;
-    }
-    @media (max-width: 768px) {
-        .footer-container {
-            flex-direction: column;
-            text-align: center;
-        }
-        .footer-column {
-            min-width: 100%;
-        }
-        .footer-column .social-icons a {
-            margin: 0 5px;
-        }
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Đọc file CSS từ bên ngoài
+with open("styles.css", "r") as f:
+    css = f.read()
+st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 # Tải dữ liệu từ Google Sheets
 @st.cache_data
