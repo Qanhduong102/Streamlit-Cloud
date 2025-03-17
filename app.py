@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
@@ -26,17 +25,20 @@ with open("credentials.yaml", "r") as file:
 
 # Khởi tạo authenticator
 authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
+    credentials=config['credentials'],
+    cookie_name=config['cookie']['name'],
+    cookie_key=config['cookie']['key'],
+    cookie_expiry_days=config['cookie']['expiry_days']
 )
 
-# Giao diện đăng nhập
-name, authentication_status, username = authenticator.login(fields={'Form name': 'Đăng nhập'}, location='main')
+# Hiển thị form đăng nhập
+authentication_status = authenticator.login(fields={'Form name': 'Đăng nhập'}, location='main')
 
 # Kiểm tra trạng thái đăng nhập
-if authentication_status:
+if st.session_state.get('authentication_status'):
+    # Lấy thông tin người dùng sau khi đăng nhập thành công
+    name = st.session_state.get('name', 'Người dùng')
+
     st.success(f"Chào mừng {name}!")
     authenticator.logout("Đăng xuất", "sidebar")
 
@@ -255,7 +257,7 @@ if authentication_status:
             </div>
         </div>
     """, unsafe_allow_html=True)
-elif authentication_status == False:
+elif st.session_state.get('authentication_status') is False:
     st.error("Tên người dùng hoặc mật khẩu không đúng!")
-elif authentication_status == None:
+elif st.session_state.get('authentication_status') is None:
     st.warning("Vui lòng nhập tên người dùng và mật khẩu.")
