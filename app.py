@@ -15,41 +15,94 @@ st.set_page_config(page_title="Phân tích Hành vi Mua sắm", layout="wide", p
 # CSS tùy chỉnh
 st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap');
+
     .main {background-color: #f5f7fa;}
     .stSidebar {background-color: #e8eef3;}
-    .stButton>button {background-color: #2e7bcf; color: white; border-radius: 5px;}
+    .stButton>button {background-color: #2e7bcf; color: white; border-radius: 5px; height: 38px; padding: 0 15px;}
     .stButton>button:hover {background-color: #1e5b9f;}
     h1 {color: #2e7bcf; font-family: 'Arial', sans-serif;}
     .stTab {background-color: #ffffff; border-radius: 10px; padding: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
-    .footer {
-        background: linear-gradient(90deg, #2e7bcf, #4a90e2);
-        color: #ffffff;
-        text-align: center;
-        padding: 15px 0;
-        position: relative;
-        bottom: 0;
-        width: 100%;
-        font-family: 'Arial', sans-serif;
-        font-size: 14px;
-        border-top: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+
+    /* Điều chỉnh căn chỉnh cho tab Dự đoán Churn */
+    .predict-container .stNumberInput > div > input {
+        height: 38px !important; /* Đảm bảo chiều cao của input bằng nút */
+        padding: 6px 12px !important;
+        vertical-align: middle;
     }
-    .footer a {
+    .predict-container .stButton {
+        margin-top: 0 !important; /* Loại bỏ margin trên của nút */
+        vertical-align: middle;
+    }
+
+    /* Footer thiết kế lại */
+    .footer {
+        background: linear-gradient(180deg, #1a2a44, #2e3b55); /* Gradient tối sang trọng */
+        color: #d1d5db;
+        padding: 40px 20px;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 14px;
+        line-height: 1.6;
+        border-top: 4px solid #2e7bcf; /* Đường viền trên màu xanh */
+    }
+    .footer-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+    .footer-column {
+        flex: 1;
+        min-width: 200px;
+        margin-bottom: 20px;
+    }
+    .footer-column h4 {
         color: #ffffff;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #2e7bcf;
+        padding-bottom: 5px;
+    }
+    .footer-column p, .footer-column a {
+        color: #d1d5db;
         text-decoration: none;
-        margin: 0 10px;
+        margin: 5px 0;
+        display: block;
+    }
+    .footer-column a:hover {
+        color: #2e7bcf; /* Màu xanh khi hover */
         transition: color 0.3s ease;
     }
-    .footer a:hover {
-        color: #ffd700; /* Màu vàng khi hover để tạo điểm nhấn */
-    }
-    .footer .social-icons a {
+    .footer-column .social-icons a {
         font-size: 18px;
-        margin: 0 8px;
+        margin-right: 10px;
+        color: #d1d5db;
+    }
+    .footer-column .social-icons a:hover {
+        color: #2e7bcf;
+    }
+    .footer-bottom {
+        text-align: center;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 20px;
+        color: #a0a5b0;
+        font-size: 13px;
     }
     @media (max-width: 768px) {
-        .footer {padding: 10px 0;}
-        .footer .social-icons a {margin: 0 5px;}
+        .footer-container {
+            flex-direction: column;
+            text-align: center;
+        }
+        .footer-column {
+            min-width: 100%;
+        }
+        .footer-column .social-icons a {
+            margin: 0 5px;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -159,11 +212,11 @@ with tabs[1]:
 # Tab 3: Dự đoán Churn
 with tabs[2]:
     st.subheader("Dự đoán Khách hàng Rời bỏ")
-    col1, col2 = st.columns([2, 1])
+    col1, col2 = st.columns([3, 1], vertical_alignment="center")  # Thêm vertical_alignment="center"
     with col1:
-        customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d")
+        customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d", key="customer_id_input")
     with col2:
-        predict_button = st.button("Dự đoán", key="predict", use_container_width=True)
+        predict_button = st.button("Dự đoán", key="predict_button", use_container_width=True)
     if predict_button:
         customer_data = customer_segments[customer_segments['Customer ID'] == customer_id]
         if not customer_data.empty:
@@ -243,12 +296,30 @@ with st.sidebar:
 # Footer
 st.markdown("""
     <div class="footer">
-        <p>© 2025 - Phát triển bởi <a href="https://example.com" target="_blank">KTDL-9 Team</a></p>
-        <div class="social-icons">
-            <a href="https://facebook.com" target="_blank"><i class="fab fa-facebook-f"></i></a>
-            <a href="https://twitter.com" target="_blank"><i class="fab fa-twitter"></i></a>
-            <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin-in"></i></a>
-            <a href="mailto:contact@ktdl9team.com"><i class="fas fa-envelope"></i></a>
-        </p>
+        <div class="footer-container">
+            <div class="footer-column">
+                <h4>StudySystem</h4>
+                <p>Phân tích hành vi mua sắm chuyên sâu để tối ưu hóa doanh thu và trải nghiệm khách hàng.</p>
+            </div>
+            <div class="footer-column">
+                <h4>Liên kết nhanh</h4>
+                <a href="https://example.com/about" target="_blank">Về chúng tôi</a>
+                <a href="https://example.com/privacy" target="_blank">Chính sách bảo mật</a>
+                <a href="https://example.com/contact" target="_blank">Liên hệ</a>
+            </div>
+            <div class="footer-column">
+                <h4>Liên hệ</h4>
+                <p>Email: <a href="mailto:contact@ktdl9team.com">contact@ktdl9team.com</a></p>
+                <p>Hotline: +84 123 456 789</p>
+                <div class="social-icons">
+                    <a href="https://facebook.com" target="_blank"><i class="fab fa-facebook-f"></i></a>
+                    <a href="https://twitter.com" target="_blank"><i class="fab fa-twitter"></i></a>
+                    <a href="https://linkedin.com" target="_blank"><i class="fab fa-linkedin-in"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2025 - Phát triển bởi KTDL-9 Team. All rights reserved.</p>
+        </div>
     </div>
 """, unsafe_allow_html=True)
