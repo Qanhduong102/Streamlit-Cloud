@@ -1,4 +1,6 @@
 import streamlit as st
+import streamlit_authenticator as stauth
+import yaml
 import pandas as pd
 import plotly.express as px
 from reportlab.lib.pagesizes import letter
@@ -16,6 +18,26 @@ st.set_page_config(page_title="Phân tích Hành vi Mua sắm", layout="wide", p
 with open("styles.css", "r", encoding="utf-8") as f:
     css = f.read()
 st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+
+# Đọc file cấu hình tài khoản
+with open("credentials.yaml", "r") as file:
+    config = yaml.safe_load(file)
+
+# Khởi tạo authenticator
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days']
+)
+
+# Giao diện đăng nhập
+name, authentication_status, username = authenticator.login("Đăng nhập", "main")
+
+# Kiểm tra trạng thái đăng nhập
+if authentication_status:
+    st.success(f"Chào mừng {name}!")
+    authenticator.logout("Đăng xuất", "sidebar")
 
 # Tải dữ liệu từ Google Sheets
 @st.cache_data
