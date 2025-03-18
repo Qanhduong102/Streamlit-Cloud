@@ -429,12 +429,12 @@ elif st.session_state.get('authentication_status'):
                 col1, col2 = st.columns(2)
                 with col1:
                     new_customer_id = st.number_input("Customer ID", min_value=1, step=1, format="%d", key="new_customer_id")
-                    new_total_purchase = st.number_input("Tổng chi tiêu ($)", min_value=0.0, step=100.0, format="%.2f", key="new_total_purchase")
-                    new_transaction_count = st.number_input("Số giao dịch", min_value=0, step=1, format="%d", key="new_transaction_count")
+                    new_total_purchase = st.number_input("Total Purchase Amount ($)", min_value=0.0, step=100.0, format="%.2f", key="new_total_purchase")
+                    new_transaction_count = st.number_input("Transaction Count", min_value=0, step=1, format="%d", key="new_transaction_count")
                 with col2:
-                    new_returns = st.number_input("Số lần hoàn trả", min_value=0, step=1, format="%d", key="new_returns")
-                    new_age = st.number_input("Độ tuổi", min_value=18, max_value=100, step=1, format="%d", key="new_age")
-                    new_customer_name = st.text_input("Tên khách hàng", key="new_customer_name")
+                    new_returns = st.number_input("Returns", min_value=0, step=1, format="%d", key="new_returns")
+                    new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
+                    new_customer_name = st.text_input("Customer Name", key="new_customer_name")
 
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
