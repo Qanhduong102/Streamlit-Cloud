@@ -16,7 +16,9 @@ import os
 from google.oauth2 import service_account
 import gspread
 import json  # Đảm bảo import json để parse credentials_json
-
+from lifelines import KaplanMeierFitter, CoxPHFitter
+import joblib
+import matplotlib.pyplot as plt
 customer_segments = pd.DataFrame()
 
 # Lấy thông tin từ biến môi trường
@@ -708,8 +710,9 @@ elif st.session_state.get('authentication_status'):
         # Tab 5: Chi tiết Khách hàng
         with tabs[4]:
             st.subheader("Chi tiết Khách hàng")
-            customer_id = st.number_input("Nhập Customer ID để xem chi tiết:", min_value=1, step=1)
+            customer_id = st.number_input("Nhập Customer ID để xem chi tiết:", min_value=1, step=1, key="customer_id_details")
             customer_data = filtered_df[filtered_df['Customer ID'] == customer_id]
+    
             if not customer_data.empty:
                 st.write(f"**Tên khách hàng**: {customer_data['Customer Name'].iloc[0]}")
                 st.write(f"**Giới tính**: {customer_data['Gender'].iloc[0]}")
@@ -719,6 +722,56 @@ elif st.session_state.get('authentication_status'):
                 fig = px.line(customer_data, x='Purchase Date', y='Total Purchase Amount', 
                       title=f"Lịch sử mua sắm của {customer_data['Customer Name'].iloc[0]} (ID: {customer_id})", height=400)
                 st.plotly_chart(fig, use_container_width=True, key="chart_customer_history")
+
+                # Dự đoán thời điểm mua sắm tiếp theo
+                st.markdown("### Dự đoán Thời điểm Mua sắm Tiếp theo")
+        
+                # Chuẩn bị dữ liệu: Tính khoảng cách giữa các lần mua
+                purchase_dates = customer_data['Purchase Date'].sort_values()
+                time_diffs = purchase_dates.diff().dt.days.dropna()  # Khoảng cách giữa các giao dịch (ngày)
+        
+                if len(time_diffs) > 0:
+                    # Tính trung bình và độ lệch chuẩn của khoảng cách
+                    avg_interval = time_diffs.mean()
+                    std_interval = time_diffs.std() if len(time_diffs) > 1 else 0
+            
+                    # Ngày mua cuối cùng
+                    last_purchase = purchase_dates.max()
+                    predicted_next_purchase = last_purchase + pd.Timedelta(days=int(avg_interval))
+                    confidence_lower = last_purchase + pd.Timedelta(days=int(avg_interval - 1.96 * std_interval)) if std_interval else last_purchase
+                    confidence_upper = last_purchase + pd.Timedelta(days=int(avg_interval + 1.96 * std_interval)) if std_interval else last_purchase
+            
+                    st.write(f"**Lần mua cuối cùng**: {last_purchase.strftime('%d/%m/%Y')}")
+                    st.write(f"**Khoảng cách trung bình giữa các lần mua**: {avg_interval:.1f} ngày")
+                    st.success(f"**Dự đoán lần mua tiếp theo**: {predicted_next_purchase.strftime('%d/%m/%Y')}", icon="⏳")
+                    st.write(f"**Khoảng tin cậy 95%**: Từ {confidence_lower.strftime('%d/%m/%Y')} đến {confidence_upper.strftime('%d/%m/%Y')}")
+            
+                    # Gợi ý hành động
+                    days_until_next = (predicted_next_purchase - pd.Timestamp.now()).days
+                    if days_until_next > 0:
+                        st.write(f"**Gợi ý**: Gửi ưu đãi trong vòng {max(1, days_until_next - 3)} ngày tới để khuyến khích mua sắm sớm.")
+                    else:
+                        st.write(f"**Gợi ý**: Gửi ưu đãi ngay hôm nay vì khách hàng có thể đã sẵn sàng mua!")
+
+                    # Biểu đồ Kaplan-Meier (tùy chọn)
+                    with st.expander("Xem phân tích chi tiết (Kaplan-Meier)", expanded=False):
+                        # Chuẩn bị dữ liệu cho Kaplan-Meier
+                        kmf = KaplanMeierFitter()
+                        # Giả định sự kiện là "mua sắm", thời gian là khoảng cách từ lần mua cuối
+                        all_customers = filtered_df.groupby('Customer ID')['Purchase Date'].agg(['min', 'max']).reset_index()
+                        all_customers['Time_Since_First'] = (all_customers['max'] - all_customers['min']).dt.days
+                        all_customers['Event'] = 1  # Giả định tất cả đều có mua sắm
+                
+                        kmf.fit(all_customers['Time_Since_First'], event_observed=all_customers['Event'])
+                        fig, ax = plt.subplots()
+                        kmf.plot_survival_function(ax=ax)
+                        ax.set_title("Xác suất Mua sắm Theo Thời gian (Tất cả Khách hàng)")
+                        ax.set_xlabel("Số ngày kể từ lần mua đầu tiên")
+                        ax.set_ylabel("Xác suất chưa mua lại")
+                        st.pyplot(fig)
+                
+                else:
+                    st.warning("Không đủ dữ liệu để dự đoán (chỉ có 1 giao dịch).")
             else:
                 st.warning("Không tìm thấy khách hàng này!")
 
