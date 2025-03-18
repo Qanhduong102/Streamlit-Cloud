@@ -406,7 +406,7 @@ elif st.session_state.get('authentication_status'):
                 customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d", key="customer_id_input")
             with col2:
                 predict_button = st.button("Dự đoán", key="predict_button", use_container_width=True)
-        
+
             if predict_button:
                 customer_data = customer_segments[customer_segments['Customer ID'] == customer_id]
                 if not customer_data.empty:
@@ -414,67 +414,67 @@ elif st.session_state.get('authentication_status'):
                     churn_pred = churn_model.predict(X)[0]
                     if hasattr(churn_model, 'predict_proba'):
                         churn_prob = churn_model.predict_proba(X)[0][1] * 100
-                        st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'} (Xác suất: {churn_prob:.2f}%)", icon="✅")
+                        st.success(f"Khách hàng {customer_id} - {customer_data['Customer Name'].iloc[0]} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'} (Xác suất: {churn_prob:.2f}%)", icon="✅")
                     else:
-                        st.success(f"Khách hàng {customer_id} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'}", icon="✅")
-                
+                        st.success(f"Khách hàng {customer_id} - {customer_data['Customer Name'].iloc[0]} {'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'}", icon="✅")
+
                     if churn_pred:
                         st.write("**Nguyên nhân tiềm năng:**")
-                        if customer_data['Transaction Count'].iloc[0] < customer_segments['Transaction Count'].mean():
-                            st.write("- Tần suất giao dịch thấp hơn trung bình.")
-                        if customer_data['Returns'].iloc[0] > customer_segments['Returns'].mean():
-                            st.write("- Tỷ lệ hoàn trả cao hơn trung bình.")
-                        if customer_data['Total Purchase Amount'].iloc[0] < customer_segments['Total Purchase Amount'].mean():
-                            st.write("- Chi tiêu thấp hơn trung bình.")
-                    
-                        customer_filtered = filtered_df[filtered_df['Customer ID'] == customer_id]
-                        last_purchase = customer_filtered['Purchase Date'].max()
-                        fav_category = customer_filtered['Product Category'].mode()[0]
-                        days_inactive = (pd.Timestamp.now() - last_purchase).days
-                        avg_spending = customer_data['Total Purchase Amount'].mean()
-                        potential_loss = avg_spending * 12
-                
-                        st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} $ (ước tính trong 12 tháng).")
-                        st.write("**Gợi ý chi tiết:**")
-                        if days_inactive > 30:
-                            st.write(f"- Khách hàng không mua {days_inactive} ngày. Gửi email ưu đãi 20% cho {fav_category}.")
-                        else:
-                            st.write(f"- Tặng mã giảm giá 10% cho {fav_category} để khuyến khích giao dịch tiếp theo.")
-                else:
-                    st.error(f"Không tìm thấy khách hàng {customer_id}!", icon="❌")
+                    if customer_data['Transaction Count'].iloc[0] < customer_segments['Transaction Count'].mean():
+                        st.write("- Tần suất giao dịch thấp hơn trung bình.")
+                    if customer_data['Returns'].iloc[0] > customer_segments['Returns'].mean():
+                        st.write("- Tỷ lệ hoàn trả cao hơn trung bình.")
+                    if customer_data['Total Purchase Amount'].iloc[0] < customer_segments['Total Purchase Amount'].mean():
+                        st.write("- Chi tiêu thấp hơn trung bình.")
 
-                st.markdown("---")
-                st.write("**Top 10 Khách hàng có nguy cơ rời bỏ cao nhất**")
-                X_all = scaler.transform(customer_segments[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-                if hasattr(churn_model, 'predict_proba'):
-                    churn_probs = churn_model.predict_proba(X_all)[:, 1]
-                    customer_segments['Churn Probability'] = churn_probs * 100
-                    top_churn = customer_segments.sort_values('Churn Probability', ascending=False).head(10)
-                    st.dataframe(top_churn[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
-                             .style.format({'Churn Probability': '{:.2f}%', 'Total Purchase Amount': '{:,.0f}'}), height=300)
-                else:
-                    churn_preds = churn_model.predict(X_all)
-                    customer_segments['Churn Prediction'] = churn_preds
-                    top_churn = customer_segments[customer_segments['Churn Prediction'] == 1].head(10)
-                    st.dataframe(top_churn[['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']], height=300)
+                    customer_filtered = filtered_df[filtered_df['Customer ID'] == customer_id]
+                    last_purchase = customer_filtered['Purchase Date'].max()
+                    fav_category = customer_filtered['Product Category'].mode()[0]
+                    days_inactive = (pd.Timestamp.now() - last_purchase).days
+                    avg_spending = customer_data['Total Purchase Amount'].mean()
+                    potential_loss = avg_spending * 12
 
-                st.markdown("---")
-                st.write("**Xu hướng Nguy cơ Churn Theo Thời gian**")
-                df_with_churn = filtered_df.merge(customer_segments[['Customer ID', 'Churn Probability']], on='Customer ID', how='left')
-                churn_trend = df_with_churn.groupby(df_with_churn['Purchase Date'].dt.to_period('M'))['Churn Probability'].mean().reset_index()
-                churn_trend['Purchase Date'] = churn_trend['Purchase Date'].astype(str)
-                fig_churn_trend = px.line(churn_trend, x='Purchase Date', y='Churn Probability', 
-                                      title="Nguy cơ Churn Trung bình Theo Tháng", height=400, line_shape='spline')
-                st.plotly_chart(fig_churn_trend, use_container_width=True, key="chart_churn_trend")
+                    st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} $ (ước tính trong 12 tháng).")
+                    st.write("**Gợi ý chi tiết:**")
+                    if days_inactive > 30:
+                        st.write(f"- Khách hàng {customer_data['Customer Name'].iloc[0]} không mua {days_inactive} ngày. Gửi email ưu đãi 20% cho {fav_category}.")
+                    else:
+                        st.write(f"- Tặng mã giảm giá 10% cho {fav_category} để khuyến khích giao dịch tiếp theo.")
+            else:
+                st.error(f"Không tìm thấy khách hàng {customer_id}!", icon="❌")
 
-                st.markdown("---")
-                st.write("**Nguy cơ Churn Theo Phân khúc Khách hàng**")
-                churn_by_cluster = customer_segments.groupby('Cluster')['Churn Probability'].mean().reset_index()
-                fig_churn_cluster = px.bar(churn_by_cluster, x='Cluster', y='Churn Probability', 
-                                       title="Nguy cơ Churn Trung bình Theo Nhóm", color='Cluster',
-                                       text=churn_by_cluster['Churn Probability'].apply(lambda x: f"{x:.2f}%"), height=400)
-                fig_churn_cluster.update_traces(textposition='outside')
-                st.plotly_chart(fig_churn_cluster, use_container_width=True, key="chart_churn_by_cluster")
+            st.markdown("---")
+            st.write("**Top 10 Khách hàng có nguy cơ rời bỏ cao nhất**")
+            X_all = scaler.transform(customer_segments[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
+            if hasattr(churn_model, 'predict_proba'):
+                churn_probs = churn_model.predict_proba(X_all)[:, 1]
+                customer_segments['Churn Probability'] = churn_probs * 100
+                top_churn = customer_segments.sort_values('Churn Probability', ascending=False).head(10)
+                st.dataframe(top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
+                         .style.format({'Churn Probability': '{:.2f}%', 'Total Purchase Amount': '{:,.0f}'}), height=300)
+            else:
+                churn_preds = churn_model.predict(X_all)
+                customer_segments['Churn Prediction'] = churn_preds
+                top_churn = customer_segments[customer_segments['Churn Prediction'] == 1].head(10)
+                st.dataframe(top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']], height=300)
+
+            st.markdown("---")
+            st.write("**Xu hướng Nguy cơ Churn Theo Thời gian**")
+            df_with_churn = filtered_df.merge(customer_segments[['Customer ID', 'Churn Probability']], on='Customer ID', how='left')
+            churn_trend = df_with_churn.groupby(df_with_churn['Purchase Date'].dt.to_period('M'))['Churn Probability'].mean().reset_index()
+            churn_trend['Purchase Date'] = churn_trend['Purchase Date'].astype(str)
+            fig_churn_trend = px.line(churn_trend, x='Purchase Date', y='Churn Probability', 
+                                  title="Nguy cơ Churn Trung bình Theo Tháng", height=400, line_shape='spline')
+            st.plotly_chart(fig_churn_trend, use_container_width=True, key="chart_churn_trend")
+
+            st.markdown("---")
+            st.write("**Nguy cơ Churn Theo Phân khúc Khách hàng**")
+            churn_by_cluster = customer_segments.groupby('Cluster')['Churn Probability'].mean().reset_index()
+            fig_churn_cluster = px.bar(churn_by_cluster, x='Cluster', y='Churn Probability', 
+                                   title="Nguy cơ Churn Trung bình Theo Nhóm", color='Cluster',
+                                   text=churn_by_cluster['Churn Probability'].apply(lambda x: f"{x:.2f}%"), height=400)
+            fig_churn_cluster.update_traces(textposition='outside')
+            st.plotly_chart(fig_churn_cluster, use_container_width=True, key="chart_churn_by_cluster")
 
         # Tab 4: Xu hướng Thời gian
         with tabs[3]:
