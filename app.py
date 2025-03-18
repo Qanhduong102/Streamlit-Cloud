@@ -82,43 +82,47 @@ elif st.session_state.get('authentication_status'):
     authenticator.logout("Đăng xuất", "sidebar")
 
    # Tải dữ liệu (ưu tiên Google Sheets nếu có credentials, nếu không dùng file CSV)
-    @st.cache_data    
+    @st.cache_data
     def load_data():
         if credentials_json:
             try:
                 credentials_dict = json.loads(credentials_json)
                 credentials = service_account.Credentials.from_service_account_info(credentials_dict)
                 gc = gspread.authorize(credentials)
-                sheet = gc.open("Purchase Data").sheet1  # Thay "Purchase Data" bằng tên Google Sheet của bạn
+                sheet = gc.open("Purchase Data").sheet1  # Thay bằng tên Google Sheet của bạn nếu dùng
                 raw_data = sheet.get_all_records()
-            
-                # Làm sạch dữ liệu: loại bỏ ký tự điều khiển không hợp lệ
+
+                # Làm sạch dữ liệu
                 clean_data = []
                 for row in raw_data:
                     clean_row = {}
                     for key, value in row.items():
                         if isinstance(value, str):
-                            # Loại bỏ ký tự điều khiển (giữ lại \n, \t, \r nếu cần)
                             clean_row[key] = ''.join(char for char in value if ord(char) >= 32 or char in '\n\t\r')
                         else:
                             clean_row[key] = value
                     clean_data.append(clean_row)
 
                 df = pd.DataFrame(clean_data)
+                # Định dạng các cột
                 df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
-                df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
+                df['Product Price'] = df['Product Price'].astype(float)
+                df['Quantity'] = df['Quantity'].astype(float)
+                df['Total Purchase Amount'] = df['Total Purchase Amount'].astype(float)
                 df['Customer ID'] = df['Customer ID'].astype(int)
                 df['Returns'] = df['Returns'].astype(float)
                 df['Age'] = df['Age'].astype(int)
+                df['Gender'] = df['Gender'].astype(str)
+                df['Payment Method'] = df['Payment Method'].astype(str)
+                df['Customer Name'] = df['Customer Name'].astype(str)
                 df['Churn'] = df['Churn'].astype(int)
                 df['Year'] = df['Year'].astype(int)
                 df['Month'] = df['Month'].astype(int)
+                df['Day of Week'] = df['Day of Week'].astype(str)
 
-                # Tải customer_segments từ Google Sheet khác (nếu có)
-                segment_sheet = gc.open("Customer Segments").sheet1  # Thay "Customer Segments" bằng tên Sheet
+                # Tải customer_segments
+                segment_sheet = gc.open("Customer Segments").sheet1
                 raw_segment_data = segment_sheet.get_all_records()
-
-                # Làm sạch dữ liệu customer_segments
                 clean_segment_data = []
                 for row in raw_segment_data:
                     clean_row = {}
@@ -128,34 +132,43 @@ elif st.session_state.get('authentication_status'):
                         else:
                             clean_row[key] = value
                     clean_segment_data.append(clean_row)
-
                 customer_segments = pd.DataFrame(clean_segment_data)
             except Exception as e:
-                # Ẩn thông báo lỗi, chỉ in ra log (tùy chọn)
-                print(f"Lỗi khi tải dữ liệu từ Google Sheets (ẩn khỏi giao diện): {e}")
-                # st.error(f"Lỗi khi tải dữ liệu từ Google Sheets: {e}")  # Comment hoặc xóa dòng này
+                print(f"Lỗi khi tải dữ liệu từ Google Sheets: {e}")
                 st.info("Sử dụng file CSV cục bộ thay thế.")
-                df = pd.read_csv("purchase_data.csv")
+                df = pd.read_csv("cleaned_customer_data.csv")
                 df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
-                df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
+                df['Product Price'] = df['Product Price'].astype(float)
+                df['Quantity'] = df['Quantity'].astype(float)
+                df['Total Purchase Amount'] = df['Total Purchase Amount'].astype(float)
                 df['Customer ID'] = df['Customer ID'].astype(int)
                 df['Returns'] = df['Returns'].astype(float)
                 df['Age'] = df['Age'].astype(int)
+                df['Gender'] = df['Gender'].astype(str)
+                df['Payment Method'] = df['Payment Method'].astype(str)
+                df['Customer Name'] = df['Customer Name'].astype(str)
                 df['Churn'] = df['Churn'].astype(int)
                 df['Year'] = df['Year'].astype(int)
                 df['Month'] = df['Month'].astype(int)
+                df['Day of Week'] = df['Day of Week'].astype(str)
                 customer_segments = pd.read_csv('customer_segments.csv')
         else:
-            # Nếu không có credentials, dùng file CSV cục bộ
-            df = pd.read_csv("purchase_data.csv")
+            # Dùng file CSV cục bộ
+            df = pd.read_csv("cleaned_customer_data.csv")
             df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
-            df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
+            df['Product Price'] = df['Product Price'].astype(float)
+            df['Quantity'] = df['Quantity'].astype(float)
+            df['Total Purchase Amount'] = df['Total Purchase Amount'].astype(float)
             df['Customer ID'] = df['Customer ID'].astype(int)
             df['Returns'] = df['Returns'].astype(float)
             df['Age'] = df['Age'].astype(int)
+            df['Gender'] = df['Gender'].astype(str)
+            df['Payment Method'] = df['Payment Method'].astype(str)
+            df['Customer Name'] = df['Customer Name'].astype(str)
             df['Churn'] = df['Churn'].astype(int)
             df['Year'] = df['Year'].astype(int)
             df['Month'] = df['Month'].astype(int)
+            df['Day of Week'] = df['Day of Week'].astype(str)
             customer_segments = pd.read_csv('customer_segments.csv')
         return df, customer_segments
 
@@ -187,8 +200,9 @@ elif st.session_state.get('authentication_status'):
             st.header("🔍 Bộ lọc Dữ liệu")
             category_filter = st.multiselect("Danh mục sản phẩm", options=['Tất cả'] + sorted(df['Product Category'].unique()), default=['Tất cả'])
             gender_filter = st.multiselect("Giới tính", options=['Tất cả'] + sorted(df['Gender'].unique()), default=['Tất cả'])
+            payment_filter = st.multiselect("Phương thức thanh toán", options=['Tất cả'] + sorted(df['Payment Method'].unique()), default=['Tất cả'])
             date_range = st.date_input("Phạm vi ngày", value=(df['Purchase Date'].min(), df['Purchase Date'].max()), 
-                                    min_value=df['Purchase Date'].min(), max_value=df['Purchase Date'].max())
+                               min_value=df['Purchase Date'].min(), max_value=df['Purchase Date'].max())
             st.markdown("---")
             st.caption(f"Cập nhật lần cuối: {pd.Timestamp.now().strftime('%d/%m/%Y')}")
 
@@ -198,8 +212,10 @@ elif st.session_state.get('authentication_status'):
             filtered_df = filtered_df[filtered_df['Product Category'].isin(category_filter)]
         if 'Tất cả' not in gender_filter:
             filtered_df = filtered_df[filtered_df['Gender'].isin(gender_filter)]
-        filtered_df = filtered_df[(filtered_df['Purchase Date'] >= pd.to_datetime(date_range[0])) & 
-                                (filtered_df['Purchase Date'] <= pd.to_datetime(date_range[1]))]
+        if 'Tất cả' not in payment_filter:
+            filtered_df = filtered_df[filtered_df['Payment Method'].isin(payment_filter)]
+            filtered_df = filtered_df[(filtered_df['Purchase Date'] >= pd.to_datetime(date_range[0])) & 
+                          (filtered_df['Purchase Date'] <= pd.to_datetime(date_range[1]))]
 
         # Tổng quan
         st.write(f"**Tổng quan dữ liệu lọc**: {len(filtered_df):,} giao dịch | Tổng doanh thu: {filtered_df['Total Purchase Amount'].sum():,.0f} $")
@@ -211,35 +227,41 @@ elif st.session_state.get('authentication_status'):
         # Tab 1: Phân tích Cơ bản
         with tabs[0]:
             st.subheader("Phân tích Cơ bản")
-            col1, col2, col3 = st.columns([1, 1, 1], gap="small")
-        
+            col1, col2, col3, col4 = st.columns([1, 1, 1, 1], gap="small")
+
             with col1:
                 revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
                 fig1 = px.bar(revenue_by_category, x='Product Category', y='Total Purchase Amount', 
-                            title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
+                      title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
                 fig1.update_traces(textposition='outside')
                 st.plotly_chart(fig1, use_container_width=True, key="chart_revenue_by_category")
-        
+
             with col2:
                 revenue_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
                 fig2 = px.line(revenue_by_day, x='Purchase Date', y='Total Purchase Amount', 
-                            title="Doanh thu Theo Ngày", height=400, line_shape='spline')
+                       title="Doanh thu Theo Ngày", height=400, line_shape='spline')
                 st.plotly_chart(fig2, use_container_width=True, key="chart_revenue_by_day")
-        
+
             with col3:
-                top_spenders = filtered_df.groupby('Customer ID').agg({
+                top_spenders = filtered_df.groupby(['Customer ID', 'Customer Name']).agg({
                     'Total Purchase Amount': 'sum',
                     'Purchase Date': 'count',
                     'Product Category': lambda x: x.mode()[0]
                 }).nlargest(5, 'Total Purchase Amount').reset_index()
-                top_spenders.columns = ['Customer ID', 'Total Purchase Amount', 'Transaction Count', 'Favorite Category']
-                fig3 = px.bar(top_spenders, x='Customer ID', y='Total Purchase Amount', 
-                            title="Top 5 Khách hàng Chi tiêu Cao nhất", 
-                            text=top_spenders['Customer ID'].astype(str) + ' (' + top_spenders['Transaction Count'].astype(str) + ' GD)',
-                            color_discrete_sequence=['#ff6f61'], height=400)
+                top_spenders.columns = ['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Favorite Category']
+                fig3 = px.bar(top_spenders, x='Customer Name', y='Total Purchase Amount', 
+                      title="Top 5 Khách hàng Chi tiêu Cao nhất", 
+                      text=top_spenders['Customer Name'] + ' (' + top_spenders['Transaction Count'].astype(str) + ' GD)',
+                      color_discrete_sequence=['#ff6f61'], height=400)
                 fig3.update_traces(textposition='outside')
                 st.plotly_chart(fig3, use_container_width=True, key="chart_top_spenders")
-        
+
+            with col4:
+                revenue_by_payment = filtered_df.groupby('Payment Method')['Total Purchase Amount'].sum().reset_index()
+                fig4 = px.pie(revenue_by_payment, values='Total Purchase Amount', names='Payment Method',
+                      title="Doanh thu theo Phương thức Thanh toán", height=400)
+                st.plotly_chart(fig4, use_container_width=True, key="chart_revenue_by_payment")
+
             # Bảng chi tiết Top 5 Khách hàng
             st.subheader("Chi tiết Top 5 Khách hàng")
             st.dataframe(top_spenders.style.format({
@@ -367,6 +389,14 @@ elif st.session_state.get('authentication_status'):
                           title=f"Danh mục Yêu thích của Nhóm {selected_cluster}", height=400)
             st.plotly_chart(fig_fav, use_container_width=True, key="chart_fav_categories")
 
+            st.subheader("Phân tích Theo Giới tính")
+            gender_spending = filtered_df.groupby('Gender')['Total Purchase Amount'].mean().reset_index()
+            fig_gender = px.bar(gender_spending, x='Gender', y='Total Purchase Amount', 
+                        title="Chi tiêu Trung bình theo Giới tính", color='Gender', 
+                        text=gender_spending['Total Purchase Amount'].round(2), height=400)
+            fig_gender.update_traces(textposition='outside')
+            st.plotly_chart(fig_gender, use_container_width=True, key="chart_gender_spending")
+
         # Tab 3: Dự đoán Churn
         with tabs[2]:
             st.subheader("Dự đoán Khách hàng Rời bỏ")
@@ -484,10 +514,13 @@ elif st.session_state.get('authentication_status'):
             customer_id = st.number_input("Nhập Customer ID để xem chi tiết:", min_value=1, step=1)
             customer_data = filtered_df[filtered_df['Customer ID'] == customer_id]
             if not customer_data.empty:
-                st.write(f"Tổng chi tiêu: {customer_data['Total Purchase Amount'].sum():,.0f} $")
-                st.dataframe(customer_data[['Purchase Date', 'Product Category', 'Total Purchase Amount', 'Returns']])
+                st.write(f"**Tên khách hàng**: {customer_data['Customer Name'].iloc[0]}")
+                st.write(f"**Giới tính**: {customer_data['Gender'].iloc[0]}")
+                st.write(f"**Tổng chi tiêu**: {customer_data['Total Purchase Amount'].sum():,.0f} $")
+                st.dataframe(customer_data[['Purchase Date', 'Product Category', 'Product Price', 'Quantity', 
+                                   'Total Purchase Amount', 'Payment Method', 'Returns']])
                 fig = px.line(customer_data, x='Purchase Date', y='Total Purchase Amount', 
-                            title=f"Lịch sử mua sắm của {customer_id}", height=400)
+                      title=f"Lịch sử mua sắm của {customer_data['Customer Name'].iloc[0]} (ID: {customer_id})", height=400)
                 st.plotly_chart(fig, use_container_width=True, key="chart_customer_history")
             else:
                 st.warning("Không tìm thấy khách hàng này!")
@@ -562,7 +595,9 @@ elif st.session_state.get('authentication_status'):
         y_position -= 20
         c.drawString(100, y_position, f"Top danh mục: {top_category}")
         y_position -= 20
-
+        top_payment = filtered_df.groupby('Payment Method')['Total Purchase Amount'].sum().idxmax()
+        c.drawString(100, y_position, f"Phương thức thanh toán phổ biến: {top_payment}")
+        y_position -= 20
         # 2. Phân tích Doanh thu theo Danh mục
         y_position = check_page_break(y_position, 20 + 20 * len(revenue_by_category))
         c.setFont("TimesNewRoman-Bold", 14)
@@ -682,6 +717,28 @@ elif st.session_state.get('authentication_status'):
         ]))
         table.wrapOn(c, width, height)
         table.drawOn(c, 100, y_position - len(data) * 20)
+
+        # Thêm phần phân tích theo Giới tính
+        y_position = check_page_break(y_position, 20 + 20 * len(filtered_df['Gender'].unique()))
+        c.setFont("TimesNewRoman-Bold", 14)
+        c.drawString(100, y_position, "8. Phân tích Theo Giới tính")
+        y_position -= 20
+        data = [["Giới tính", "Chi tiêu Trung bình ($)"]]
+        for gender, spending in filtered_df.groupby('Gender')['Total Purchase Amount'].mean().items():
+            data.append([gender, f"{spending:,.0f}"])
+    
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('FONTNAME', (0, 0), (-1, -1), 'TimesNewRoman'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ]))
+        table.wrapOn(c, width, height)
+        table.drawOn(c, 100, y_position - len(data) * 20)
+        y_position -= (len(data) * 20 + 20)
 
         # Kết thúc và lưu PDF
         c.showPage()
