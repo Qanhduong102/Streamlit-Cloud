@@ -436,47 +436,8 @@ elif st.session_state.get('authentication_status'):
                     new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
                     new_customer_name = st.text_input("Customer Name", key="new_customer_name")
 
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
                     analyze_button = st.form_submit_button("Phân tích nguy cơ Churn", use_container_width=True)
-                with col_btn2:
-                    save_button = st.form_submit_button("Thêm vào CSV", use_container_width=True)
-            # Xử lý khi nhấn nút Thêm vào CSV
-            if save_button:
-                # Tạo DataFrame cho khách hàng mới từ dữ liệu nhập
-                new_customer_data = pd.DataFrame({
-                    'Customer ID': [new_customer_id],
-                    'Customer Name': [new_customer_name],
-                    'Total Purchase Amount': [new_total_purchase],
-                    'Transaction Count': [new_transaction_count],
-                    'Returns': [new_returns],
-                    'Age': [new_age]
-                })
-
-                # Đường dẫn tới file CSV (có thể cần điều chỉnh tùy theo vị trí file của bạn)
-                csv_file_path = 'customer_segments.csv'
-
-                try:
-                    # Kiểm tra xem file đã tồn tại hay chưa
-                    if os.path.exists(csv_file_path):
-                        # Đọc dữ liệu hiện có từ file CSV
-                        existing_data = pd.read_csv(csv_file_path)
-                        # Kiểm tra xem Customer ID đã tồn tại chưa
-                        if new_customer_id in existing_data['Customer ID'].values:
-                            st.error(f"Customer ID {new_customer_id} đã tồn tại trong dữ liệu!", icon="❌")
-                        else:
-                            # Nối dữ liệu mới vào dữ liệu hiện có
-                            updated_data = pd.concat([existing_data, new_customer_data], ignore_index=True)
-                            # Ghi lại vào file CSV
-                            updated_data.to_csv(csv_file_path, index=False)
-                            st.success(f"Đã thêm khách hàng {new_customer_id} - {new_customer_name} vào {csv_file_path}!", icon="✅")
-                    else:
-                        # Nếu file chưa tồn tại, tạo mới và ghi dữ liệu
-                        new_customer_data.to_csv(csv_file_path, index=False)
-                        st.success(f"Đã tạo file {csv_file_path} và thêm khách hàng {new_customer_id} - {new_customer_name}!", icon="✅")
-
-                except Exception as e:
-                    st.error(f"Lỗi khi lưu vào CSV: {str(e)}", icon="❌")
+                    
             # Xử lý khi nhấn nút Phân tích
             if analyze_button:
                 # Tạo DataFrame cho khách hàng mới
