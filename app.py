@@ -15,6 +15,7 @@ from reportlab.platypus import Table, TableStyle
 import os
 from google.oauth2 import service_account
 import gspread
+import json  # Đảm bảo import json để parse credentials_json
 
 # Lấy thông tin từ biến môi trường
 credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
@@ -188,13 +189,13 @@ elif st.session_state.get('authentication_status'):
                 fig1 = px.bar(revenue_by_category, x='Product Category', y='Total Purchase Amount', 
                             title="Doanh thu theo Danh mục", color='Product Category', text_auto='.2s', height=400)
                 fig1.update_traces(textposition='outside')
-                st.plotly_chart(fig1, use_container_width=True)
+                st.plotly_chart(fig1, use_container_width=True, key="chart_revenue_by_category")
         
             with col2:
                 revenue_by_day = filtered_df.groupby(filtered_df['Purchase Date'].dt.date)['Total Purchase Amount'].sum().reset_index()
                 fig2 = px.line(revenue_by_day, x='Purchase Date', y='Total Purchase Amount', 
                             title="Doanh thu Theo Ngày", height=400, line_shape='spline')
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, use_container_width=True, key="chart_revenue_by_day")
         
             with col3:
                 top_spenders = filtered_df.groupby('Customer ID').agg({
@@ -208,7 +209,7 @@ elif st.session_state.get('authentication_status'):
                             text=top_spenders['Customer ID'].astype(str) + ' (' + top_spenders['Transaction Count'].astype(str) + ' GD)',
                             color_discrete_sequence=['#ff6f61'], height=400)
                 fig3.update_traces(textposition='outside')
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, use_container_width=True, key="chart_top_spenders")
         
             # Bảng chi tiết Top 5 Khách hàng
             st.subheader("Chi tiết Top 5 Khách hàng")
@@ -231,7 +232,7 @@ elif st.session_state.get('authentication_status'):
             fig_category_day = px.line(category_by_day, x='Purchase Date', y='Total Purchase Amount', 
                                     title=f"Doanh thu Theo Ngày của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", 
                                     height=400, line_shape='spline')
-            st.plotly_chart(fig_category_day, use_container_width=True)
+            st.plotly_chart(fig_category_day, use_container_width=True, key="chart_category_by_day")
         
             with st.expander(f"🔎 Xem dữ liệu chi tiết của {'Tất cả Danh mục' if selected_category == 'Tất cả' else selected_category}", expanded=False):
                 if selected_category == 'Tất cả':
@@ -293,7 +294,7 @@ elif st.session_state.get('authentication_status'):
                         title="Chi tiêu Trung bình theo Nhóm", color='Cluster', 
                         text=avg_spending['Total Purchase Amount'].round(2), height=400)
             fig4.update_traces(textposition='outside')
-            st.plotly_chart(fig4, use_container_width=True)
+            st.plotly_chart(fig4, use_container_width=True, key="chart_avg_spending")
 
             cluster_compare = customer_segments.groupby('Cluster').agg({
                 'Total Purchase Amount': 'mean',
@@ -305,14 +306,14 @@ elif st.session_state.get('authentication_status'):
                                  title="So sánh Chi tiêu TB và Tỷ lệ Hoàn trả",
                                  labels={'Total Purchase Amount': 'Chi tiêu TB (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
                                  height=400)
-            st.plotly_chart(fig_compare, use_container_width=True)
+            st.plotly_chart(fig_compare, use_container_width=True, key="chart_cluster_compare")
 
             df_with_clusters = filtered_df.merge(customer_segments[['Customer ID', 'Cluster']], on='Customer ID', how='left')
             cluster_trends = df_with_clusters.groupby(['Cluster', df_with_clusters['Purchase Date'].dt.to_period('M')])['Total Purchase Amount'].sum().reset_index()
             cluster_trends['Purchase Date'] = cluster_trends['Purchase Date'].astype(str)
             fig_trends = px.line(cluster_trends, x='Purchase Date', y='Total Purchase Amount', color='Cluster',
                               title="Xu hướng Chi tiêu Theo Tháng của Các Nhóm", height=400, line_shape='spline')
-            st.plotly_chart(fig_trends, use_container_width=True)
+            st.plotly_chart(fig_trends, use_container_width=True, key="chart_cluster_trends")
 
             st.subheader("Gợi ý Hành động Theo Nhóm")
             for cluster in cluster_summary.index:
@@ -335,7 +336,7 @@ elif st.session_state.get('authentication_status'):
             fav_categories = cluster_purchases.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
             fig_fav = px.pie(fav_categories, values='Total Purchase Amount', names='Product Category',
                           title=f"Danh mục Yêu thích của Nhóm {selected_cluster}", height=400)
-            st.plotly_chart(fig_fav, use_container_width=True)
+            st.plotly_chart(fig_fav, use_container_width=True, key="chart_fav_categories")
 
         # Tab 3: Dự đoán Churn
         with tabs[2]:
@@ -405,7 +406,7 @@ elif st.session_state.get('authentication_status'):
                 churn_trend['Purchase Date'] = churn_trend['Purchase Date'].astype(str)
                 fig_churn_trend = px.line(churn_trend, x='Purchase Date', y='Churn Probability', 
                                       title="Nguy cơ Churn Trung bình Theo Tháng", height=400, line_shape='spline')
-                st.plotly_chart(fig_churn_trend, use_container_width=True)
+                st.plotly_chart(fig_churn_trend, use_container_width=True, key="chart_churn_trend")
 
                 st.markdown("---")
                 st.write("**Nguy cơ Churn Theo Phân khúc Khách hàng**")
@@ -414,7 +415,7 @@ elif st.session_state.get('authentication_status'):
                                        title="Nguy cơ Churn Trung bình Theo Nhóm", color='Cluster',
                                        text=churn_by_cluster['Churn Probability'].apply(lambda x: f"{x:.2f}%"), height=400)
                 fig_churn_cluster.update_traces(textposition='outside')
-                st.plotly_chart(fig_churn_cluster, use_container_width=True)
+                st.plotly_chart(fig_churn_cluster, use_container_width=True, key="chart_churn_by_cluster")
 
         # Tab 4: Xu hướng Thời gian
         with tabs[3]:
@@ -428,7 +429,7 @@ elif st.session_state.get('authentication_status'):
                                 text=hourly_trends['Total Purchase Amount'].apply(lambda x: f"{x:,.0f}"), 
                                 height=400)
                 fig_hourly.update_traces(textposition='outside')
-                st.plotly_chart(fig_hourly, use_container_width=True)
+                st.plotly_chart(fig_hourly, use_container_width=True, key="chart_hourly_trends")
             else:
                 st.warning("Dữ liệu không chứa thông tin giờ chi tiết để phân tích theo giờ.")
 
@@ -437,7 +438,7 @@ elif st.session_state.get('authentication_status'):
             monthly_revenue['Purchase Date'] = monthly_revenue['Purchase Date'].astype(str)
             fig5 = px.line(monthly_revenue, x='Purchase Date', y='Total Purchase Amount', 
                         title="Doanh thu Theo Tháng", height=400, line_shape='spline')
-            st.plotly_chart(fig5, use_container_width=True)
+            st.plotly_chart(fig5, use_container_width=True, key="chart_monthly_revenue")
 
             quarterly_trends = filtered_df.groupby(filtered_df['Purchase Date'].dt.to_period('Q'))['Total Purchase Amount'].sum().reset_index()
             quarterly_trends['Purchase Date'] = quarterly_trends['Purchase Date'].astype(str)
@@ -446,7 +447,7 @@ elif st.session_state.get('authentication_status'):
                                 text=quarterly_trends['Total Purchase Amount'].apply(lambda x: f"{x:,.0f}"), 
                                 height=400)
             fig_quarterly.update_traces(textposition='outside')
-            st.plotly_chart(fig_quarterly, use_container_width=True)
+            st.plotly_chart(fig_quarterly, use_container_width=True, key="chart_quarterly_trends")
 
         # Tab 5: Chi tiết Khách hàng
         with tabs[4]:
@@ -458,7 +459,7 @@ elif st.session_state.get('authentication_status'):
                 st.dataframe(customer_data[['Purchase Date', 'Product Category', 'Total Purchase Amount', 'Returns']])
                 fig = px.line(customer_data, x='Purchase Date', y='Total Purchase Amount', 
                             title=f"Lịch sử mua sắm của {customer_id}", height=400)
-                st.plotly_chart(fig)
+                st.plotly_chart(fig, use_container_width=True, key="chart_customer_history")
             else:
                 st.warning("Không tìm thấy khách hàng này!")
 
@@ -469,14 +470,9 @@ elif st.session_state.get('authentication_status'):
             fig6 = px.bar(return_rate, x='Product Category', y='Returns', 
                         title="Tỷ lệ Hoàn trả theo Danh mục", text_auto='.2%', height=400)
             fig6.update_traces(textposition='outside')
-            st.plotly_chart(fig6, use_container_width=True)
+            st.plotly_chart(fig6, use_container_width=True, key="chart_return_rate_1")
 
-            return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
-            fig6 = px.bar(return_rate, x='Product Category', y='Returns', 
-                        title="Tỷ lệ Hoàn trả theo Danh mục", text_auto='.2%', height=400)
-            fig6.update_traces(textposition='outside')
-            st.plotly_chart(fig6, use_container_width=True)
-
+            # Xóa hoặc sửa biểu đồ trùng lặp thứ hai
             return_vs_revenue = filtered_df.groupby('Product Category').agg({'Returns': 'mean', 'Total Purchase Amount': 'sum'}).reset_index()
             return_vs_revenue['Returns'] = return_vs_revenue['Returns'] * 100
             fig_compare = px.scatter(return_vs_revenue, x='Total Purchase Amount', y='Returns', 
@@ -484,7 +480,7 @@ elif st.session_state.get('authentication_status'):
                                  title="Tỷ lệ Hoàn trả so với Doanh thu",
                                  labels={'Total Purchase Amount': 'Doanh thu (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
                                  height=400)
-            st.plotly_chart(fig_compare, use_container_width=True)
+            st.plotly_chart(fig_compare, use_container_width=True, key="chart_return_vs_revenue")  # Sửa fig6 thành fig_compare
             st.write("**Gợi ý**: Danh mục có doanh thu cao nhưng tỷ lệ hoàn trả lớn cần cải thiện chất lượng sản phẩm.")
 
     def generate_pdf():
@@ -692,5 +688,3 @@ elif st.session_state.get('authentication_status') is False:
     st.error("Tên người dùng hoặc mật khẩu không đúng!")
 elif st.session_state.get('authentication_status') is None:
     st.warning("Vui lòng nhập tên người dùng và mật khẩu.")
-
-import json  # Đảm bảo import json để parse credentials_json
