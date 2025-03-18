@@ -436,24 +436,86 @@ elif st.session_state.get('authentication_status'):
                     X = scaler.transform(customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
                     churn_pred = churn_model.predict(X)[0]
                     customer_name = customer_data['Customer Name'].iloc[0] if 'Customer Name' in customer_data.columns else 'Unknown'
+            
+                    # Hiển thị toàn bộ thông tin khách hàng
+                    st.markdown("### Thông tin chi tiết của khách hàng")
+                    st.dataframe(customer_data.style.format({
+                        'Total Purchase Amount': '{:,.0f}',
+                        'Transaction Count': '{:.0f}',
+                        'Returns': '{:.0f}',
+                        'Age': '{:.0f}'
+                    }), use_container_width=True)
+
+                    # Tính toán và giải thích xác suất
                     if hasattr(churn_model, 'predict_proba'):
                         churn_prob = churn_model.predict_proba(X)[0][1] * 100
+                        prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 75 else 
+                                 "có nguy cơ rời bỏ" if churn_prob >= 50 else 
+                                 "không có nguy cơ rời bỏ")
                         st.success(f"Khách hàng {customer_id} - {customer_name} "
-                            f"{'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'} (Xác suất: {churn_prob:.2f}%)", icon="✅")
+                          f"{prediction_text} (Xác suất: {churn_prob:.2f}%)", icon="✅")
+                
+                        # Giải thích chi tiết xác suất
+                        st.markdown("### Giải thích dự đoán")
+                        st.write(f"Xác suất churn {churn_prob:.2f}% được tính dựa trên các yếu tố:")
+                
+                        # So sánh với giá trị trung bình
+                        factors = [
+                            ('Total Purchase Amount', 'Tổng chi tiêu', 'thấp hơn', 'cao hơn'),
+                            ('Transaction Count', 'Số giao dịch', 'ít hơn', 'nhiều hơn'),
+                            ('Returns', 'Số lần hoàn trả', 'cao hơn', 'thấp hơn'),
+                            ('Age', 'Độ tuổi', 'trẻ hơn', 'lớn hơn')
+                        ]
+                
+                        explanations = []
+                        for col, name, low_text, high_text in factors:
+                            value = customer_data[col].iloc[0]
+                            mean_value = customer_segments[col].mean()
+                            diff_percent = ((value - mean_value) / mean_value) * 100
+                    
+                            if col == 'Returns':
+                                impact = "tăng nguy cơ churn" if value > mean_value else "giảm nguy cơ churn"
+                                comparison = high_text if value > mean_value else low_text
+                            else:
+                                impact = "giảm nguy cơ churn" if value > mean_value else "tăng nguy cơ churn"
+                                comparison = high_text if value > mean_value else low_text
+                        
+                            explanations.append(
+                                f"- {name}: {value:,.0f} ({comparison} trung bình {mean_value:,.0f} khoảng {abs(diff_percent):.1f}%), "
+                                f"{impact}"
+                            )
+                
+                        for exp in explanations:
+                            st.write(exp)
+                
+                        # Ngưỡng phân loại
+                        st.write("\n**Cách phân loại nguy cơ:**")
+                        st.write("- ≥ 75%: Nguy cơ rời bỏ cao")
+                        st.write("- 50-74%: Có nguy cơ rời bỏ")
+                        st.write("- < 50%: Không có nguy cơ rời bỏ")
+            
                     else:
-                        st.success(f"Khách hàng {customer_id} - {customer_name} "
-                           f"{'có nguy cơ rời bỏ' if churn_pred else 'không rời bỏ'}", icon="✅")
+                        prediction_text = "có nguy cơ rời bỏ" if churn_pred else "không rời bỏ"
+                        st.success(f"Khách hàng {customer_id} - {customer_name} {prediction_text}", icon="✅")
 
-                    if churn_pred:
-                        st.write("**Nguyên nhân tiềm năng:**")
+                    # Phân tích nguyên nhân tiềm năng
+                    if churn_pred or (hasattr(churn_model, 'predict_proba') and churn_prob >= 50):
+                        st.markdown("### Nguyên nhân tiềm năng")
+                        reasons = []
                         if customer_data['Transaction Count'].iloc[0] < customer_segments['Transaction Count'].mean():
-                            st.write("- Tần suất giao dịch thấp hơn trung bình.")
+                            reasons.append("- Tần suất giao dịch thấp hơn trung bình")
                         if customer_data['Returns'].iloc[0] > customer_segments['Returns'].mean():
-                            st.write("- Tỷ lệ hoàn trả cao hơn trung bình.")
+                            reasons.append("- Tỷ lệ hoàn trả cao hơn trung bình")
                         if customer_data['Total Purchase Amount'].iloc[0] < customer_segments['Total Purchase Amount'].mean():
-                            st.write("- Chi tiêu thấp hơn trung bình.")
+                            reasons.append("- Chi tiêu thấp hơn trung bình")
+                
+                        if reasons:
+                            for reason in reasons:
+                                st.write(reason)
+                        else:
+                            st.write("- Không có nguyên nhân cụ thể được xác định")
 
-                    # Kiểm tra filtered_df trước khi sử dụng
+                    # Gợi ý hành động
                     if 'filtered_df' in globals() and not filtered_df.empty:
                         customer_filtered = filtered_df[filtered_df['Customer ID'] == customer_id]
                         if not customer_filtered.empty:
@@ -463,12 +525,16 @@ elif st.session_state.get('authentication_status'):
                             avg_spending = customer_data['Total Purchase Amount'].mean()
                             potential_loss = avg_spending * 12
 
-                            st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} $ (ước tính trong 12 tháng).")
-                            st.write("**Gợi ý chi tiết:**")
+                            st.markdown("### Phân tích bổ sung và Gợi ý")
+                            st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} $ (ước tính 12 tháng)")
+                            st.write(f"**Thông tin hành vi:**")
+                            st.write(f"- Lần mua cuối: {days_inactive} ngày trước")
+                            st.write(f"- Danh mục yêu thích: {fav_category}")
+                            st.write("**Gợi ý hành động:**")
                             if days_inactive > 30:
-                                st.write(f"- Khách hàng {customer_name} không mua {days_inactive} ngày. Gửi email ưu đãi 20% cho {fav_category}.")
+                                st.write(f"- Gửi email ưu đãi 20% cho {fav_category} để tái kích hoạt")
                             else:
-                                st.write(f"- Tặng mã giảm giá 10% cho {fav_category} để khuyến khích giao dịch tiếp theo.")
+                                st.write(f"- Tặng mã giảm giá 10% cho {fav_category} để khuyến khích mua sắm")
                     else:
                         st.warning("Dữ liệu filtered_df không khả dụng để tính toán chi tiết.")
                 else:
