@@ -81,7 +81,7 @@ elif st.session_state.get('authentication_status'):
     st.markdown(f'<div class="success-message">Chào mừng {name}!</div>', unsafe_allow_html=True)
     authenticator.logout("Đăng xuất", "sidebar")
 
-    # Tải dữ liệu (ưu tiên Google Sheets nếu có credentials, nếu không dùng file CSV)
+   # Tải dữ liệu (ưu tiên Google Sheets nếu có credentials, nếu không dùng file CSV)
     @st.cache_data    
     def load_data():
         if credentials_json:
@@ -91,7 +91,7 @@ elif st.session_state.get('authentication_status'):
                 gc = gspread.authorize(credentials)
                 sheet = gc.open("Purchase Data").sheet1  # Thay "Purchase Data" bằng tên Google Sheet của bạn
                 raw_data = sheet.get_all_records()
-                
+            
                 # Làm sạch dữ liệu: loại bỏ ký tự điều khiển không hợp lệ
                 clean_data = []
                 for row in raw_data:
@@ -131,7 +131,9 @@ elif st.session_state.get('authentication_status'):
 
                 customer_segments = pd.DataFrame(clean_segment_data)
             except Exception as e:
-                st.error(f"Lỗi khi tải dữ liệu từ Google Sheets: {e}")
+                # Ẩn thông báo lỗi, chỉ in ra log (tùy chọn)
+                print(f"Lỗi khi tải dữ liệu từ Google Sheets (ẩn khỏi giao diện): {e}")
+                # st.error(f"Lỗi khi tải dữ liệu từ Google Sheets: {e}")  # Comment hoặc xóa dòng này
                 st.info("Sử dụng file CSV cục bộ thay thế.")
                 df = pd.read_csv("purchase_data.csv")
                 df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
