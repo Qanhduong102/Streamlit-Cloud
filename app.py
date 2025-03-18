@@ -82,7 +82,7 @@ elif st.session_state.get('authentication_status'):
     authenticator.logout("Đăng xuất", "sidebar")
 
     # Tải dữ liệu (ưu tiên Google Sheets nếu có credentials, nếu không dùng file CSV)
-    @st.cache_data
+    @st.cache_data    
     def load_data():
         if credentials_json:
             try:
@@ -90,7 +90,21 @@ elif st.session_state.get('authentication_status'):
                 credentials = service_account.Credentials.from_service_account_info(credentials_dict)
                 gc = gspread.authorize(credentials)
                 sheet = gc.open("Purchase Data").sheet1  # Thay "Purchase Data" bằng tên Google Sheet của bạn
-                df = pd.DataFrame(sheet.get_all_records())
+                raw_data = sheet.get_all_records()
+
+                # Làm sạch dữ liệu: loại bỏ ký tự điều khiển không hợp lệ
+                clean_data = []
+                for row in raw_data:
+                    clean_row = {}
+                    for key, value in row.items():
+                        if isinstance(value, str):
+                            # Loại bỏ ký tự điều khiển (giữ lại \n, \t, \r nếu cần)
+                            clean_row[key] = ''.join(char for char in value if ord(char) >= 32 or char in '\n\t\r')
+                        else:
+                            clean_row[key] = value
+                    clean_data.append(clean_row)
+
+                df = pd.DataFrame(clean_data)
                 df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
                 df['Total Purchase Amount'] = df['Product Price'].astype(float) * df['Quantity'].astype(float)
                 df['Customer ID'] = df['Customer ID'].astype(int)
@@ -102,7 +116,20 @@ elif st.session_state.get('authentication_status'):
 
                 # Tải customer_segments từ Google Sheet khác (nếu có)
                 segment_sheet = gc.open("Customer Segments").sheet1  # Thay "Customer Segments" bằng tên Sheet
-                customer_segments = pd.DataFrame(segment_sheet.get_all_records())
+                raw_segment_data = segment_sheet.get_all_records()
+
+                # Làm sạch dữ liệu customer_segments
+                clean_segment_data = []
+                for row in raw_segment_data:
+                    clean_row = {}
+                    for key, value in row.items():
+                        if isinstance(value, str):
+                            clean_row[key] = ''.join(char for char in value if ord(char) >= 32 or char in '\n\t\r')
+                        else:
+                            clean_row[key] = value
+                    clean_segment_data.append(clean_row)
+
+                customer_segments = pd.DataFrame(clean_segment_data)
             except Exception as e:
                 st.error(f"Lỗi khi tải dữ liệu từ Google Sheets: {e}")
                 st.info("Sử dụng file CSV cục bộ thay thế.")
