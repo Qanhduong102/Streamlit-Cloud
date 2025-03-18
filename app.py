@@ -521,6 +521,13 @@ elif st.session_state.get('authentication_status'):
         pdfmetrics.registerFont(TTFont('TimesNewRoman', 'times.ttf'))
         pdfmetrics.registerFont(TTFont('TimesNewRoman-Bold', 'timesbd.ttf'))
 
+        # Hàm kiểm tra và tạo trang mới nếu cần
+        def check_page_break(y_position, space_needed):
+            if y_position - space_needed < 50:  # Ngưỡng dưới cùng của trang
+                c.showPage()
+                return height - 50  # Reset về đầu trang mới
+            return y_position
+
         # Tiêu đề báo cáo
         c.setFillColorRGB(0.18, 0.48, 0.81)
         c.setFont("TimesNewRoman-Bold", 16)
@@ -531,10 +538,11 @@ elif st.session_state.get('authentication_status'):
         c.line(100, 720, 500, 720)
 
         # 1. Tổng quan
+        y_position = 700
         c.setFont("TimesNewRoman-Bold", 14)
-        c.drawString(100, 700, "1. Tổng quan Dữ liệu")
+        c.drawString(100, y_position, "1. Tổng quan Dữ liệu")
+        y_position -= 20
         c.setFont("TimesNewRoman", 12)
-        y_position = 680
         total_revenue = filtered_df['Total Purchase Amount'].sum()
         total_revenue = 0 if pd.isna(total_revenue) else total_revenue
         transaction_count = len(filtered_df)
@@ -547,8 +555,8 @@ elif st.session_state.get('authentication_status'):
         y_position -= 20
 
         # 2. Phân tích Doanh thu theo Danh mục
+        y_position = check_page_break(y_position, 20 + 20 * len(revenue_by_category))
         c.setFont("TimesNewRoman-Bold", 14)
-        y_position -= 20
         c.drawString(100, y_position, "2. Doanh thu theo Danh mục Sản phẩm")
         y_position -= 20
         revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
@@ -570,6 +578,7 @@ elif st.session_state.get('authentication_status'):
         y_position -= (len(data) * 20 + 20)
 
         # 3. Top 5 Khách hàng Chi tiêu Nhiều nhất
+        y_position = check_page_break(y_position, 20 + 20 * 6)  # 6 dòng cho top 5 + header
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "3. Top 5 Khách hàng Chi tiêu Nhiều nhất")
         y_position -= 20
@@ -592,6 +601,7 @@ elif st.session_state.get('authentication_status'):
         y_position -= (len(data) * 20 + 20)
 
         # 4. Phân khúc Khách hàng
+        y_position = check_page_break(y_position, 20 + 20 * len(avg_spending))
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "4. Phân khúc Khách hàng")
         y_position -= 20
@@ -614,6 +624,7 @@ elif st.session_state.get('authentication_status'):
         y_position -= (len(data) * 20 + 20)
 
         # 5. Tỷ lệ Hoàn trả theo Danh mục
+        y_position = check_page_break(y_position, 20 + 20 * len(return_rate))
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "5. Tỷ lệ Hoàn trả theo Danh mục")
         y_position -= 20
@@ -636,6 +647,7 @@ elif st.session_state.get('authentication_status'):
         y_position -= (len(data) * 20 + 20)
 
         # 6. Gợi ý Hành động
+        y_position = check_page_break(y_position, 60)
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "6. Gợi ý Hành động")
         y_position -= 20
@@ -648,6 +660,7 @@ elif st.session_state.get('authentication_status'):
         y_position -= 20
 
         # 7. Dự đoán Doanh thu
+        y_position = check_page_break(y_position, 20 + 20 * 4)  # 4 dòng cho 3 tháng + header
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "7. Dự đoán Doanh thu 3 Tháng Tới")
         y_position -= 20
@@ -680,7 +693,7 @@ elif st.session_state.get('authentication_status'):
         if st.button("📥 Xuất Báo cáo PDF", key="export", use_container_width=True):
             pdf_buffer = generate_pdf()
             st.download_button(label="Tải Báo cáo PDF", data=pdf_buffer, file_name="purchase_analysis_report.pdf", 
-                            mime="application/pdf", use_container_width=True)
+                           mime="application/pdf", use_container_width=True)
             st.success("Báo cáo đã sẵn sàng để tải!", icon="📄")
 
     # Footer
