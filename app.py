@@ -17,6 +17,8 @@ from google.oauth2 import service_account
 import gspread
 import json  # Đảm bảo import json để parse credentials_json
 
+customer_segments = pd.DataFrame()
+
 # Lấy thông tin từ biến môi trường
 credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
@@ -422,6 +424,78 @@ elif st.session_state.get('authentication_status'):
 
         # Tab 3: Dự đoán Churn
         with tabs[2]:
+            st.markdown("### Nhập thông tin khách hàng mới")
+            with st.form(key='new_customer_form'):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_customer_id = st.number_input("Customer ID", min_value=1, step=1, format="%d", key="new_customer_id")
+                    new_total_purchase = st.number_input("Tổng chi tiêu ($)", min_value=0.0, step=100.0, format="%.2f", key="new_total_purchase")
+                    new_transaction_count = st.number_input("Số giao dịch", min_value=0, step=1, format="%d", key="new_transaction_count")
+                with col2:
+                    new_returns = st.number_input("Số lần hoàn trả", min_value=0, step=1, format="%d", key="new_returns")
+                    new_age = st.number_input("Độ tuổi", min_value=18, max_value=100, step=1, format="%d", key="new_age")
+                    new_customer_name = st.text_input("Tên khách hàng", key="new_customer_name")
+
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    analyze_button = st.form_submit_button("Phân tích nguy cơ Churn", use_container_width=True)
+                with col_btn2:
+                    save_button = st.form_submit_button("Thêm vào CSV", use_container_width=True)
+
+            # Xử lý khi nhấn nút Phân tích
+            if analyze_button:
+                # Tạo DataFrame cho khách hàng mới
+                new_customer_data = pd.DataFrame({
+                    'Customer ID': [new_customer_id],
+                    'Customer Name': [new_customer_name],
+                    'Total Purchase Amount': [new_total_purchase],
+                    'Transaction Count': [new_transaction_count],
+                    'Returns': [new_returns],
+                    'Age': [new_age]
+                })
+    
+                # Chuẩn hóa dữ liệu và dự đoán
+                X_new = scaler.transform(new_customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
+                churn_pred = churn_model.predict(X_new)[0]
+    
+                st.markdown("### Kết quả phân tích khách hàng mới")
+                st.dataframe(new_customer_data.style.format({
+                    'Total Purchase Amount': '{:,.0f}',
+                    'Transaction Count': '{:.0f}',
+                    'Returns': '{:.0f}',
+                    'Age': '{:.0f}'
+                }), use_container_width=True)
+
+                # Dự đoán và giải thích
+                if hasattr(churn_model, 'predict_proba'):
+                    churn_prob = churn_model.predict_proba(X_new)[0][1] * 100
+                    prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 75 else 
+                          "có nguy cơ rời bỏ" if churn_prob >= 50 else 
+                          "không có nguy cơ rời bỏ")
+                    st.success(f"Khách hàng {new_customer_id} - {new_customer_name} "
+                            f"{prediction_text} (Xác suất: {churn_prob:.2f}%)", icon="✅")
+        
+                    # Giải thích chi tiết
+                    st.markdown("#### Giải thích dự đoán")
+                    st.write(f"Xác suất churn {churn_prob:.2f}% dựa trên:")
+                    factors = [
+                        ('Total Purchase Amount', 'Tổng chi tiêu', 'thấp hơn', 'cao hơn'),
+                        ('Transaction Count', 'Số giao dịch', 'ít hơn', 'nhiều hơn'),
+                        ('Returns', 'Số lần hoàn trả', 'cao hơn', 'thấp hơn'),
+                        ('Age', 'Độ tuổi', 'trẻ hơn', 'lớn hơn')
+                    ]
+        
+                    for col, name, low_text, high_text in factors:
+                        value = new_customer_data[col].iloc[0]
+                        mean_value = customer_segments[col].mean()
+                        diff_percent = ((value - mean_value) / mean_value) * 100
+                        comparison = high_text if value > mean_value else low_text
+                        impact = "tăng nguy cơ churn" if (col == 'Returns' and value > mean_value) or (col != 'Returns' and value < mean_value) else "giảm nguy cơ churn"
+                        st.write(f"- {name}: {value:,.0f} ({comparison} trung bình {mean_value:,.0f} khoảng {abs(diff_percent):.1f}%), {impact}")
+                else:
+                    prediction_text = "có nguy cơ rời bỏ" if churn_pred else "không rời bỏ"
+                    st.success(f"Khách hàng {new_customer_id} - {new_customer_name} {prediction_text}", icon="✅")
+
             st.subheader("Dự đoán Khách hàng Rời bỏ")
 
             col1, col2 = st.columns([3, 1], vertical_alignment="center")
