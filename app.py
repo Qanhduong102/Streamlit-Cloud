@@ -91,7 +91,7 @@ elif st.session_state.get('authentication_status'):
                 gc = gspread.authorize(credentials)
                 sheet = gc.open("Purchase Data").sheet1  # Thay "Purchase Data" bằng tên Google Sheet của bạn
                 raw_data = sheet.get_all_records()
-
+                print("Dữ liệu thô hàng 5:", raw_data[4])  # Hàng 5 tương ứng chỉ số 4
                 # Làm sạch dữ liệu: loại bỏ ký tự điều khiển không hợp lệ
                 clean_data = []
                 for row in raw_data:
