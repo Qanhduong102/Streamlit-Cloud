@@ -437,7 +437,7 @@ elif st.session_state.get('authentication_status'):
                     new_customer_name = st.text_input("Customer Name", key="new_customer_name")
 
                     # Sử dụng ba cột để đặt nút ở giữa
-                    col_left, col_center, col_right = st.columns([2, 2, 1])
+                    col_left, col_center, col_right = st.columns([3, 2, 0])
                     with col_center:
                         analyze_button = st.form_submit_button("Phân tích nguy cơ Churn", use_container_width=True)
 
