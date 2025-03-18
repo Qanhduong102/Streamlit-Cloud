@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import joblib
 
 # Đọc và làm sạch dữ liệu
-df = pd.read_csv('customer_data.csv', parse_dates=['Purchase Date'], dtype={
+df = pd.read_csv('cleaned_customer_data.csv', parse_dates=['Purchase Date'], dtype={
     'Customer ID': 'int32', 'Product Price': 'int32', 'Quantity': 'int32',
     'Total Purchase Amount': 'int32', 'Age': 'int32', 'Churn': 'int8',
     'Year': 'int16', 'Month': 'int8'
