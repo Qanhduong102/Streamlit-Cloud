@@ -436,8 +436,11 @@ elif st.session_state.get('authentication_status'):
                     new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
                     new_customer_name = st.text_input("Customer Name", key="new_customer_name")
 
+                    # Đặt nút Phân tích và Xóa trong cột riêng
+                col1, col2 = st.columns(2)
+                with col1:
                     analyze_button = st.form_submit_button("Phân tích nguy cơ Churn", use_container_width=True)
-                with col_btn2:
+                with col2:
                     save_button = st.form_submit_button("Xóa", use_container_width=True)
 
             # Xử lý khi nhấn nút Xóa
