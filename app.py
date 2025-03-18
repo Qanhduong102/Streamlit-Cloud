@@ -528,6 +528,19 @@ elif st.session_state.get('authentication_status'):
                 return height - 50  # Reset về đầu trang mới
             return y_position
 
+        # Tính toán trước tất cả dữ liệu cần thiết
+        total_revenue = filtered_df['Total Purchase Amount'].sum()
+        total_revenue = 0 if pd.isna(total_revenue) else total_revenue
+        transaction_count = len(filtered_df)
+        top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax() if not filtered_df.empty else "Không có dữ liệu"
+        revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
+        top_spenders = filtered_df.groupby('Customer ID')['Total Purchase Amount'].sum().nlargest(5).reset_index()
+        avg_spending = customer_segments.groupby('Cluster')['Total Purchase Amount'].mean().reset_index()
+        return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
+        low_transaction_day = filtered_df.groupby('Day of Week')['Customer ID'].count().idxmin()
+        future_months = np.arange(len(monthly_revenue), len(monthly_revenue) + 3).reshape(-1, 1)
+        future_pred = revenue_model.predict(future_months)
+
         # Tiêu đề báo cáo
         c.setFillColorRGB(0.18, 0.48, 0.81)
         c.setFont("TimesNewRoman-Bold", 16)
@@ -543,14 +556,10 @@ elif st.session_state.get('authentication_status'):
         c.drawString(100, y_position, "1. Tổng quan Dữ liệu")
         y_position -= 20
         c.setFont("TimesNewRoman", 12)
-        total_revenue = filtered_df['Total Purchase Amount'].sum()
-        total_revenue = 0 if pd.isna(total_revenue) else total_revenue
-        transaction_count = len(filtered_df)
         c.drawString(100, y_position, f"Tổng doanh thu: {total_revenue:,.0f} $")
         y_position -= 20
         c.drawString(100, y_position, f"Số giao dịch: {transaction_count:,}")
         y_position -= 20
-        top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax() if not filtered_df.empty else "Không có dữ liệu"
         c.drawString(100, y_position, f"Top danh mục: {top_category}")
         y_position -= 20
 
@@ -559,7 +568,6 @@ elif st.session_state.get('authentication_status'):
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "2. Doanh thu theo Danh mục Sản phẩm")
         y_position -= 20
-        revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
         data = [["Danh mục", "Doanh thu ($)"]]
         for _, row in revenue_by_category.iterrows():
             data.append([row['Product Category'], f"{row['Total Purchase Amount']:,.0f}"])
@@ -582,7 +590,6 @@ elif st.session_state.get('authentication_status'):
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "3. Top 5 Khách hàng Chi tiêu Nhiều nhất")
         y_position -= 20
-        top_spenders = filtered_df.groupby('Customer ID')['Total Purchase Amount'].sum().nlargest(5).reset_index()
         data = [["Customer ID", "Tổng Chi tiêu ($)"]]
         for _, row in top_spenders.iterrows():
             data.append([str(row['Customer ID']), f"{row['Total Purchase Amount']:,.0f}"])
@@ -605,7 +612,6 @@ elif st.session_state.get('authentication_status'):
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "4. Phân khúc Khách hàng")
         y_position -= 20
-        avg_spending = customer_segments.groupby('Cluster')['Total Purchase Amount'].mean().reset_index()
         data = [["Nhóm (Cluster)", "Chi tiêu Trung bình ($)"]]
         for _, row in avg_spending.iterrows():
             data.append([str(row['Cluster']), f"{row['Total Purchase Amount']:,.0f}"])
@@ -628,7 +634,6 @@ elif st.session_state.get('authentication_status'):
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "5. Tỷ lệ Hoàn trả theo Danh mục")
         y_position -= 20
-        return_rate = filtered_df.groupby('Product Category')['Returns'].mean().reset_index()
         data = [["Danh mục", "Tỷ lệ Hoàn trả (%)"]]
         for _, row in return_rate.iterrows():
             data.append([row['Product Category'], f"{row['Returns']:.2f}%"])
@@ -652,10 +657,8 @@ elif st.session_state.get('authentication_status'):
         c.drawString(100, y_position, "6. Gợi ý Hành động")
         y_position -= 20
         c.setFont("TimesNewRoman", 12)
-        low_transaction_day = filtered_df.groupby('Day of Week')['Customer ID'].count().idxmin()
         c.drawString(100, y_position, f"- Tăng khuyến mãi vào {low_transaction_day} (ngày ít giao dịch nhất).")
         y_position -= 20
-        top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()
         c.drawString(100, y_position, f"- Tập trung quảng bá {top_category} (danh mục doanh thu cao nhất).")
         y_position -= 20
 
@@ -664,8 +667,6 @@ elif st.session_state.get('authentication_status'):
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "7. Dự đoán Doanh thu 3 Tháng Tới")
         y_position -= 20
-        future_months = np.arange(len(monthly_revenue), len(monthly_revenue) + 3).reshape(-1, 1)
-        future_pred = revenue_model.predict(future_months)
         data = [["Tháng", "Doanh thu Dự đoán ($)"]]
         for i, pred in enumerate(future_pred):
             data.append([f"Tháng {i+1}", f"{int(pred):,.0f}"])
