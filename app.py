@@ -16,7 +16,7 @@ import os
 from google.oauth2 import service_account
 import gspread
 import json  # Đảm bảo import json để parse credentials_json
-from lifelines import KaplanMeierFitter, CoxPHFitter
+from lifelines import KaplanMeierFitter
 import joblib
 import matplotlib.pyplot as plt
 customer_segments = pd.DataFrame()
