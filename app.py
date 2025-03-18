@@ -436,11 +436,21 @@ elif st.session_state.get('authentication_status'):
                     new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
                     new_customer_name = st.text_input("Customer Name", key="new_customer_name")
 
-                    # Sử dụng ba cột để đặt nút ở giữa
-                    col_left, col_center, col_right = st.columns([1, 2, 1])
-                    with col_center:
-                        analyze_button = st.form_submit_button("Phân tích nguy cơ Churn", use_container_width=True)
+                    analyze_button = st.form_submit_button("Phân tích nguy cơ Churn", use_container_width=True)
+                with col_btn2:
+                    save_button = st.form_submit_button("Xóa", use_container_width=True)
 
+            # Xử lý khi nhấn nút Xóa
+            if save_button:
+                # Reset các giá trị trong session state về mặc định
+                st.session_state.new_customer_id = 1
+                st.session_state.new_total_purchase = 0.0
+                st.session_state.new_transaction_count = 0
+                st.session_state.new_returns = 0
+                st.session_state.new_age = 18
+                st.session_state.new_customer_name = ""
+                st.experimental_rerun()  # Tải lại form để áp dụng giá trị mới
+            
             # Xử lý khi nhấn nút Phân tích
             if analyze_button:
                 # Tạo DataFrame cho khách hàng mới
