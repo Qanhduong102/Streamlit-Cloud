@@ -193,10 +193,6 @@ elif st.session_state.get('authentication_status'):
             if missing_segment_cols:
                 st.error(f"Các cột thiếu trong customer_segments.csv: {missing_segment_cols}")
                 return None, None
-
-        # Debug: In ra cột để kiểm tra
-        st.write("Cột trong customer_segments:", customer_segments.columns.tolist())
-
         return df, customer_segments
 
     # Tải mô hình
