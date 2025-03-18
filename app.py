@@ -202,7 +202,7 @@ elif st.session_state.get('authentication_status'):
                                 (filtered_df['Purchase Date'] <= pd.to_datetime(date_range[1]))]
 
         # Tổng quan
-        st.write(f"**Tổng quan dữ liệu lọc**: {len(filtered_df):,} giao dịch | Tổng doanh thu: {filtered_df['Total Purchase Amount'].sum():,.0f} VND")
+        st.write(f"**Tổng quan dữ liệu lọc**: {len(filtered_df):,} giao dịch | Tổng doanh thu: {filtered_df['Total Purchase Amount'].sum():,.0f} $")
 
         # Tabs
         tabs = st.tabs(["📈 Phân tích Cơ bản", "👥 Phân khúc Khách hàng", "⚠️ Dự đoán Churn", "📅 Xu hướng Thời gian", 
@@ -243,7 +243,7 @@ elif st.session_state.get('authentication_status'):
             # Bảng chi tiết Top 5 Khách hàng
             st.subheader("Chi tiết Top 5 Khách hàng")
             st.dataframe(top_spenders.style.format({
-                'Total Purchase Amount': '{:,.0f} VND',
+                'Total Purchase Amount': '{:,.0f} $',
                 'Transaction Count': '{:,}',
             }), height=200, use_container_width=True)
         
@@ -268,19 +268,19 @@ elif st.session_state.get('authentication_status'):
                     detailed_data = filtered_df.groupby(['Purchase Date', 'Product Category'])['Total Purchase Amount'].sum().unstack().fillna(0)
                     limited_data = detailed_data.head(50)
                     st.write(f"**Hiển thị 50 ngày đầu tiên (tổng số ngày: {len(detailed_data)})**")
-                    st.dataframe(limited_data.style.format('{:,.0f} VND'), height=400, use_container_width=True)
+                    st.dataframe(limited_data.style.format('{:,.0f} $'), height=400, use_container_width=True)
                 else:
                     detailed_data = filtered_df[filtered_df['Product Category'] == selected_category].groupby('Purchase Date')['Total Purchase Amount'].sum().reset_index()
-                    st.dataframe(detailed_data.style.format('{:,.0f} VND'), height=400, use_container_width=True)
+                    st.dataframe(detailed_data.style.format('{:,.0f} $'), height=400, use_container_width=True)
         
             st.subheader("Gợi ý Hành động")
             low_transaction_day = filtered_df.groupby('Day of Week')['Customer ID'].count().idxmin()
             low_day_revenue = filtered_df.groupby('Day of Week')['Total Purchase Amount'].sum().min()
-            st.write(f"- Tăng khuyến mãi 15% vào {low_transaction_day} (doanh thu thấp nhất: {low_day_revenue:,.0f} VND) qua email hoặc SMS.")
+            st.write(f"- Tăng khuyến mãi 15% vào {low_transaction_day} (doanh thu thấp nhất: {low_day_revenue:,.0f} $) qua email hoặc SMS.")
         
             top_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().idxmax()
             top_category_revenue = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().max()
-            st.write(f"- Đẩy mạnh quảng bá {top_category} (doanh thu: {top_category_revenue:,.0f} VND) qua mạng xã hội và banner trên website.")
+            st.write(f"- Đẩy mạnh quảng bá {top_category} (doanh thu: {top_category_revenue:,.0f} $) qua mạng xã hội và banner trên website.")
         
             st.write("- **Chiến lược cho Top Khách hàng:**")
             for vip in top_spenders['Customer ID']:
@@ -304,14 +304,14 @@ elif st.session_state.get('authentication_status'):
                     'Age': 'mean',
                     'Customer ID': 'count'
                 }).rename(columns={
-                    'Total Purchase Amount': 'Chi tiêu TB (VND)',
+                    'Total Purchase Amount': 'Chi tiêu TB ($)',
                     'Transaction Count': 'Tần suất GD TB',
                     'Returns': 'Tỷ lệ Hoàn trả TB',
                     'Age': 'Độ tuổi TB',
                     'Customer ID': 'Số lượng KH'
                 })
                 st.dataframe(cluster_summary.style.format({
-                    'Chi tiêu TB (VND)': '{:,.0f}',
+                    'Chi tiêu TB ($)': '{:,.0f}',
                     'Tần suất GD TB': '{:.2f}',
                     'Tỷ lệ Hoàn trả TB': '{:.2%}',
                     'Độ tuổi TB': '{:.1f}',
@@ -333,7 +333,7 @@ elif st.session_state.get('authentication_status'):
             fig_compare = px.scatter(cluster_compare, x='Total Purchase Amount', y='Returns', 
                                  color='Cluster', size='Total Purchase Amount',
                                  title="So sánh Chi tiêu TB và Tỷ lệ Hoàn trả",
-                                 labels={'Total Purchase Amount': 'Chi tiêu TB (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
+                                 labels={'Total Purchase Amount': 'Chi tiêu TB ($)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
                                  height=400)
             st.plotly_chart(fig_compare, use_container_width=True, key="chart_cluster_compare")
 
@@ -346,11 +346,11 @@ elif st.session_state.get('authentication_status'):
 
             st.subheader("Gợi ý Hành động Theo Nhóm")
             for cluster in cluster_summary.index:
-                spending = cluster_summary.loc[cluster, 'Chi tiêu TB (VND)']
+                spending = cluster_summary.loc[cluster, 'Chi tiêu TB ($)']
                 frequency = cluster_summary.loc[cluster, 'Tần suất GD TB']
                 returns = cluster_summary.loc[cluster, 'Tỷ lệ Hoàn trả TB']
                 st.write(f"**Nhóm {cluster}:**")
-                if spending > cluster_summary['Chi tiêu TB (VND)'].mean() and frequency < cluster_summary['Tần suất GD TB'].mean():
+                if spending > cluster_summary['Chi tiêu TB ($)'].mean() and frequency < cluster_summary['Tần suất GD TB'].mean():
                     st.write(f"- Chi tiêu cao nhưng ít giao dịch: Tặng mã giảm giá định kỳ để tăng tần suất mua sắm.")
                 elif returns > cluster_summary['Tỷ lệ Hoàn trả TB'].mean():
                     st.write(f"- Tỷ lệ hoàn trả cao: Cải thiện chất lượng sản phẩm hoặc kiểm tra chính sách đổi trả.")
@@ -404,7 +404,7 @@ elif st.session_state.get('authentication_status'):
                         avg_spending = customer_data['Total Purchase Amount'].mean()
                         potential_loss = avg_spending * 12
                 
-                        st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} VND (ước tính trong 12 tháng).")
+                        st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} $ (ước tính trong 12 tháng).")
                         st.write("**Gợi ý chi tiết:**")
                         if days_inactive > 30:
                             st.write(f"- Khách hàng không mua {days_inactive} ngày. Gửi email ưu đãi 20% cho {fav_category}.")
@@ -484,7 +484,7 @@ elif st.session_state.get('authentication_status'):
             customer_id = st.number_input("Nhập Customer ID để xem chi tiết:", min_value=1, step=1)
             customer_data = filtered_df[filtered_df['Customer ID'] == customer_id]
             if not customer_data.empty:
-                st.write(f"Tổng chi tiêu: {customer_data['Total Purchase Amount'].sum():,.0f} VND")
+                st.write(f"Tổng chi tiêu: {customer_data['Total Purchase Amount'].sum():,.0f} $")
                 st.dataframe(customer_data[['Purchase Date', 'Product Category', 'Total Purchase Amount', 'Returns']])
                 fig = px.line(customer_data, x='Purchase Date', y='Total Purchase Amount', 
                             title=f"Lịch sử mua sắm của {customer_id}", height=400)
@@ -507,7 +507,7 @@ elif st.session_state.get('authentication_status'):
             fig_compare = px.scatter(return_vs_revenue, x='Total Purchase Amount', y='Returns', 
                                  color='Product Category', size='Total Purchase Amount',
                                  title="Tỷ lệ Hoàn trả so với Doanh thu",
-                                 labels={'Total Purchase Amount': 'Doanh thu (VND)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
+                                 labels={'Total Purchase Amount': 'Doanh thu ($)', 'Returns': 'Tỷ lệ Hoàn trả (%)'},
                                  height=400)
             st.plotly_chart(fig_compare, use_container_width=True, key="chart_return_vs_revenue")  # Sửa fig6 thành fig_compare
             st.write("**Gợi ý**: Danh mục có doanh thu cao nhưng tỷ lệ hoàn trả lớn cần cải thiện chất lượng sản phẩm.")
@@ -538,7 +538,7 @@ elif st.session_state.get('authentication_status'):
         total_revenue = filtered_df['Total Purchase Amount'].sum()
         total_revenue = 0 if pd.isna(total_revenue) else total_revenue
         transaction_count = len(filtered_df)
-        c.drawString(100, y_position, f"Tổng doanh thu: {total_revenue:,.0f} VND")
+        c.drawString(100, y_position, f"Tổng doanh thu: {total_revenue:,.0f} $")
         y_position -= 20
         c.drawString(100, y_position, f"Số giao dịch: {transaction_count:,}")
         y_position -= 20
@@ -552,7 +552,7 @@ elif st.session_state.get('authentication_status'):
         c.drawString(100, y_position, "2. Doanh thu theo Danh mục Sản phẩm")
         y_position -= 20
         revenue_by_category = filtered_df.groupby('Product Category')['Total Purchase Amount'].sum().reset_index()
-        data = [["Danh mục", "Doanh thu (VND)"]]
+        data = [["Danh mục", "Doanh thu ($)"]]
         for _, row in revenue_by_category.iterrows():
             data.append([row['Product Category'], f"{row['Total Purchase Amount']:,.0f}"])
     
@@ -574,7 +574,7 @@ elif st.session_state.get('authentication_status'):
         c.drawString(100, y_position, "3. Top 5 Khách hàng Chi tiêu Nhiều nhất")
         y_position -= 20
         top_spenders = filtered_df.groupby('Customer ID')['Total Purchase Amount'].sum().nlargest(5).reset_index()
-        data = [["Customer ID", "Tổng Chi tiêu (VND)"]]
+        data = [["Customer ID", "Tổng Chi tiêu ($)"]]
         for _, row in top_spenders.iterrows():
             data.append([str(row['Customer ID']), f"{row['Total Purchase Amount']:,.0f}"])
     
@@ -596,7 +596,7 @@ elif st.session_state.get('authentication_status'):
         c.drawString(100, y_position, "4. Phân khúc Khách hàng")
         y_position -= 20
         avg_spending = customer_segments.groupby('Cluster')['Total Purchase Amount'].mean().reset_index()
-        data = [["Nhóm (Cluster)", "Chi tiêu Trung bình (VND)"]]
+        data = [["Nhóm (Cluster)", "Chi tiêu Trung bình ($)"]]
         for _, row in avg_spending.iterrows():
             data.append([str(row['Cluster']), f"{row['Total Purchase Amount']:,.0f}"])
     
@@ -653,7 +653,7 @@ elif st.session_state.get('authentication_status'):
         y_position -= 20
         future_months = np.arange(len(monthly_revenue), len(monthly_revenue) + 3).reshape(-1, 1)
         future_pred = revenue_model.predict(future_months)
-        data = [["Tháng", "Doanh thu Dự đoán (VND)"]]
+        data = [["Tháng", "Doanh thu Dự đoán ($)"]]
         for i, pred in enumerate(future_pred):
             data.append([f"Tháng {i+1}", f"{int(pred):,.0f}"])
     
