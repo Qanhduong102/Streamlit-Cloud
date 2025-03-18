@@ -89,10 +89,9 @@ elif st.session_state.get('authentication_status'):
                 credentials_dict = json.loads(credentials_json)
                 credentials = service_account.Credentials.from_service_account_info(credentials_dict)
                 gc = gspread.authorize(credentials)
-                sheet = gc.open("Purchase Data").sheet1  # Thay bằng tên Google Sheet của bạn nếu dùng
+                sheet = gc.open("Purchase Data").sheet1
                 raw_data = sheet.get_all_records()
 
-                # Làm sạch dữ liệu
                 clean_data = []
                 for row in raw_data:
                     clean_row = {}
@@ -100,25 +99,32 @@ elif st.session_state.get('authentication_status'):
                         if isinstance(value, str):
                             clean_row[key] = ''.join(char for char in value if ord(char) >= 32 or char in '\n\t\r')
                         else:
-                            clean_row[key] = value
+                            clean_row[key] = value if value is not None else None
                     clean_data.append(clean_row)
 
                 df = pd.DataFrame(clean_data)
-                # Định dạng các cột
-                df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
-                df['Product Price'] = df['Product Price'].astype(float)
-                df['Quantity'] = df['Quantity'].astype(float)
-                df['Total Purchase Amount'] = df['Total Purchase Amount'].astype(float)
-                df['Customer ID'] = df['Customer ID'].astype(int)
-                df['Returns'] = df['Returns'].astype(float)
-                df['Age'] = df['Age'].astype(int)
-                df['Gender'] = df['Gender'].astype(str)
-                df['Payment Method'] = df['Payment Method'].astype(str)
-                df['Customer Name'] = df['Customer Name'].astype(str)
-                df['Churn'] = df['Churn'].astype(int)
-                df['Year'] = df['Year'].astype(int)
-                df['Month'] = df['Month'].astype(int)
-                df['Day of Week'] = df['Day of Week'].astype(str)
+                required_columns = ['Customer ID', 'Purchase Date', 'Product Category', 'Product Price', 'Quantity',
+                              'Total Purchase Amount', 'Payment Method', 'Returns', 'Customer Name', 'Age',
+                              'Gender', 'Churn', 'Year', 'Month', 'Day of Week']
+                missing_cols = [col for col in required_columns if col not in df.columns]
+                if missing_cols:
+                    st.error(f"Các cột thiếu trong dữ liệu Google Sheets: {missing_cols}")
+                    return None, None
+
+                df['Purchase Date'] = pd.to_datetime(df['Purchase Date'], errors='coerce')
+                df['Product Price'] = pd.to_numeric(df['Product Price'], errors='coerce').fillna(0.0)
+                df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0)
+                df['Total Purchase Amount'] = pd.to_numeric(df['Total Purchase Amount'], errors='coerce').fillna(0.0)
+                df['Customer ID'] = pd.to_numeric(df['Customer ID'], errors='coerce').fillna(0).astype(int)
+                df['Returns'] = pd.to_numeric(df['Returns'], errors='coerce').fillna(0.0)
+                df['Age'] = pd.to_numeric(df['Age'], errors='coerce').fillna(df['Age'].median()).round(0).astype(int)
+                df['Gender'] = df['Gender'].astype(str).fillna('Unknown')
+                df['Payment Method'] = df['Payment Method'].astype(str).fillna('Unknown')
+                df['Customer Name'] = df['Customer Name'].astype(str).fillna('Unknown')
+                df['Churn'] = pd.to_numeric(df['Churn'], errors='coerce').fillna(0).astype(int)
+                df['Year'] = pd.to_numeric(df['Year'], errors='coerce').fillna(0).astype(int)
+                df['Month'] = pd.to_numeric(df['Month'], errors='coerce').fillna(0).astype(int)
+                df['Day of Week'] = df['Day of Week'].astype(str).fillna('Unknown')
 
                 # Tải customer_segments
                 segment_sheet = gc.open("Customer Segments").sheet1
@@ -130,46 +136,67 @@ elif st.session_state.get('authentication_status'):
                         if isinstance(value, str):
                             clean_row[key] = ''.join(char for char in value if ord(char) >= 32 or char in '\n\t\r')
                         else:
-                            clean_row[key] = value
+                            clean_row[key] = value if value is not None else None
                     clean_segment_data.append(clean_row)
                 customer_segments = pd.DataFrame(clean_segment_data)
+                required_segment_cols = ['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count',
+                                  'Returns', 'Age', 'Gender', 'Cluster', 'Churn Probability']
+                missing_segment_cols = [col for col in required_segment_cols if col not in customer_segments.columns]
+                if missing_segment_cols:
+                    st.error(f"Các cột thiếu trong Customer Segments từ Google Sheets: {missing_segment_cols}")
+                    return None, None
             except Exception as e:
                 print(f"Lỗi khi tải dữ liệu từ Google Sheets: {e}")
                 st.info("Sử dụng file CSV cục bộ thay thế.")
                 df = pd.read_csv("cleaned_customer_data.csv")
-                df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
-                df['Product Price'] = df['Product Price'].astype(float)
-                df['Quantity'] = df['Quantity'].astype(float)
-                df['Total Purchase Amount'] = df['Total Purchase Amount'].astype(float)
-                df['Customer ID'] = df['Customer ID'].astype(int)
-                df['Returns'] = df['Returns'].astype(float)
-                df['Age'] = df['Age'].astype(int)
-                df['Gender'] = df['Gender'].astype(str)
-                df['Payment Method'] = df['Payment Method'].astype(str)
-                df['Customer Name'] = df['Customer Name'].astype(str)
-                df['Churn'] = df['Churn'].astype(int)
-                df['Year'] = df['Year'].astype(int)
-                df['Month'] = df['Month'].astype(int)
-                df['Day of Week'] = df['Day of Week'].astype(str)
+                df['Purchase Date'] = pd.to_datetime(df['Purchase Date'], errors='coerce')
+                df['Product Price'] = pd.to_numeric(df['Product Price'], errors='coerce').fillna(0.0)
+                df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0)
+                df['Total Purchase Amount'] = pd.to_numeric(df['Total Purchase Amount'], errors='coerce').fillna(0.0)
+                df['Customer ID'] = pd.to_numeric(df['Customer ID'], errors='coerce').fillna(0).astype(int)
+                df['Returns'] = pd.to_numeric(df['Returns'], errors='coerce').fillna(0.0)
+                df['Age'] = pd.to_numeric(df['Age'], errors='coerce').fillna(df['Age'].median()).round(0).astype(int)
+                df['Gender'] = df['Gender'].astype(str).fillna('Unknown')
+                df['Payment Method'] = df['Payment Method'].astype(str).fillna('Unknown')
+                df['Customer Name'] = df['Customer Name'].astype(str).fillna('Unknown')
+                df['Churn'] = pd.to_numeric(df['Churn'], errors='coerce').fillna(0).astype(int)
+                df['Year'] = pd.to_numeric(df['Year'], errors='coerce').fillna(0).astype(int)
+                df['Month'] = pd.to_numeric(df['Month'], errors='coerce').fillna(0).astype(int)
+                df['Day of Week'] = df['Day of Week'].astype(str).fillna('Unknown')
                 customer_segments = pd.read_csv('customer_segments.csv')
+                required_segment_cols = ['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count',
+                                  'Returns', 'Age', 'Gender', 'Cluster', 'Churn Probability']
+                missing_segment_cols = [col for col in required_segment_cols if col not in customer_segments.columns]
+                if missing_segment_cols:
+                    st.error(f"Các cột thiếu trong customer_segments.csv: {missing_segment_cols}")
+                    return None, None
         else:
-            # Dùng file CSV cục bộ
             df = pd.read_csv("cleaned_customer_data.csv")
-            df['Purchase Date'] = pd.to_datetime(df['Purchase Date'])
-            df['Product Price'] = df['Product Price'].astype(float)
-            df['Quantity'] = df['Quantity'].astype(float)
-            df['Total Purchase Amount'] = df['Total Purchase Amount'].astype(float)
-            df['Customer ID'] = df['Customer ID'].astype(int)
-            df['Returns'] = df['Returns'].astype(float)
-            df['Age'] = df['Age'].astype(int)
-            df['Gender'] = df['Gender'].astype(str)
-            df['Payment Method'] = df['Payment Method'].astype(str)
-            df['Customer Name'] = df['Customer Name'].astype(str)
-            df['Churn'] = df['Churn'].astype(int)
-            df['Year'] = df['Year'].astype(int)
-            df['Month'] = df['Month'].astype(int)
-            df['Day of Week'] = df['Day of Week'].astype(str)
+            df['Purchase Date'] = pd.to_datetime(df['Purchase Date'], errors='coerce')
+            df['Product Price'] = pd.to_numeric(df['Product Price'], errors='coerce').fillna(0.0)
+            df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce').fillna(0.0)
+            df['Total Purchase Amount'] = pd.to_numeric(df['Total Purchase Amount'], errors='coerce').fillna(0.0)
+            df['Customer ID'] = pd.to_numeric(df['Customer ID'], errors='coerce').fillna(0).astype(int)
+            df['Returns'] = pd.to_numeric(df['Returns'], errors='coerce').fillna(0.0)
+            df['Age'] = pd.to_numeric(df['Age'], errors='coerce').fillna(df['Age'].median()).round(0).astype(int)
+            df['Gender'] = df['Gender'].astype(str).fillna('Unknown')
+            df['Payment Method'] = df['Payment Method'].astype(str).fillna('Unknown')
+            df['Customer Name'] = df['Customer Name'].astype(str).fillna('Unknown')
+            df['Churn'] = pd.to_numeric(df['Churn'], errors='coerce').fillna(0).astype(int)
+            df['Year'] = pd.to_numeric(df['Year'], errors='coerce').fillna(0).astype(int)
+            df['Month'] = pd.to_numeric(df['Month'], errors='coerce').fillna(0).astype(int)
+            df['Day of Week'] = df['Day of Week'].astype(str).fillna('Unknown')
             customer_segments = pd.read_csv('customer_segments.csv')
+            required_segment_cols = ['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count',
+                              'Returns', 'Age', 'Gender', 'Cluster', 'Churn Probability']
+            missing_segment_cols = [col for col in required_segment_cols if col not in customer_segments.columns]
+            if missing_segment_cols:
+                st.error(f"Các cột thiếu trong customer_segments.csv: {missing_segment_cols}")
+                return None, None
+
+        # Debug: In ra cột để kiểm tra
+        st.write("Cột trong customer_segments:", customer_segments.columns.tolist())
+
         return df, customer_segments
 
     # Tải mô hình
