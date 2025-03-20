@@ -19,11 +19,6 @@ import json  # Đảm bảo import json để parse credentials_json
 from lifelines import KaplanMeierFitter
 import joblib
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import roc_auc_score
-from xgboost import XGBClassifier
-from imblearn.over_sampling import SMOTE
-import joblib
 customer_segments = pd.DataFrame()
 
 # Lấy thông tin từ biến môi trường
@@ -208,22 +203,13 @@ elif st.session_state.get('authentication_status'):
     @st.cache_resource
     def load_models():
         try:
-            churn_model = joblib.load('churn_model_new.pkl')  # Tải mô hình mới
-            scaler = joblib.load('scaler_new.pkl')  # Tải scaler mới
+            churn_model = joblib.load('churn_model.pkl')
+            scaler = joblib.load('scaler.pkl')
             revenue_model = joblib.load('revenue_model.pkl')
             return churn_model, scaler, revenue_model
         except Exception as e:
             st.error(f"Lỗi khi tải mô hình: {e}")
             return None, None, None
-        # Thêm đặc trưng mới cho customer_segments
-        customer_segments['Avg_Transaction_Frequency'] = customer_segments['Transaction Count'] / (customer_segments['Age'] - 18 + 1)  # +1 để tránh chia cho 0
-        customer_segments['Return_Rate'] = customer_segments['Returns'] / customer_segments['Transaction Count'].replace(0, 1)  # Tránh chia cho 0
-
-        # Thêm đặc trưng mới cho df (nếu cần)
-        df['Avg_Transaction_Frequency'] = df['Transaction Count'] / (df['Age'] - 18 + 1)
-        df['Return_Rate'] = df['Returns'] / df['Transaction Count'].replace(0, 1)
-
-        return df, customer_segments
 
     df, customer_segments = load_data()
     churn_model, scaler, revenue_model = load_models()
@@ -497,8 +483,8 @@ elif st.session_state.get('authentication_status'):
                 # Dự đoán và giải thích
                 if hasattr(churn_model, 'predict_proba'):
                     churn_prob = churn_model.predict_proba(X_new)[0][1] * 100
-                    prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 23 else 
-                          "có nguy cơ rời bỏ" if churn_prob >= 21 else 
+                    prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 75 else 
+                          "có nguy cơ rời bỏ" if churn_prob >= 50 else 
                           "không có nguy cơ rời bỏ")
                     st.success(f"Khách hàng {new_customer_id} - {new_customer_name} "
                             f"{prediction_text} (Xác suất: {churn_prob:.2f}%)", icon="✅")
@@ -590,11 +576,11 @@ elif st.session_state.get('authentication_status'):
                         for exp in explanations:
                             st.write(exp)
                 
-                       # Ngưỡng phân loại
+                        # Ngưỡng phân loại
                         st.write("\n**Cách phân loại nguy cơ:**")
                         st.write("- ≥ 23%: Nguy cơ rời bỏ cao")
-                        st.write("- 21-23%: Có nguy cơ rời bỏ")
-                        st.write("- < 21%: Không có nguy cơ rời bỏ")    
+                        st.write("- 21%: Có nguy cơ rời bỏ")
+                        st.write("- < 21%: Không có nguy cơ rời bỏ")
             
                     else:
                         prediction_text = "có nguy cơ rời bỏ" if churn_pred else "không rời bỏ"
@@ -915,73 +901,6 @@ elif st.session_state.get('authentication_status'):
                 st.write("- **Kết hợp mô hình**: Tạo một pipeline kết hợp cả churn và revenue để dự đoán doanh thu tiềm năng bị mất do churn.")
                 st.write("- **Thử nghiệm mô hình khác**: So sánh với các thuật toán khác (ví dụ: SVM, Neural Networks) để tìm mô hình tối ưu hơn.")
                 st.write("- **Đánh giá định lượng**: Thêm các chỉ số như accuracy, RMSE để so sánh hiệu suất cụ thể.")
-
-                # Phần mới: Huấn luyện lại mô hình churn
-                st.markdown("### 7. Huấn luyện lại Mô hình Churn")
-                st.write("Huấn luyện lại mô hình `churn_model` với XGBoost để cải thiện khả năng phân biệt khách hàng churn.")
-
-                # Chuẩn bị dữ liệu huấn luyện
-                if 'Churn' in df.columns:
-                    # Sử dụng các đặc trưng bao gồm cả đặc trưng mới
-                    X = df[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Avg_Transaction_Frequency', 'Return_Rate']]
-                    y = df['Churn']
-
-                    # Chia dữ liệu thành tập huấn luyện và kiểm tra
-                    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-
-                    # Chuẩn hóa dữ liệu
-                    scaler.fit(X_train)
-                    X_train_scaled = scaler.transform(X_train)
-                    X_test_scaled = scaler.transform(X_test)
-
-                    # Xử lý dữ liệu không cân bằng bằng SMOTE
-                    smote = SMOTE(random_state=42)
-                    X_train_balanced, y_train_balanced = smote.fit_resample(X_train_scaled, y_train)
-
-                    # Huấn luyện mô hình XGBoost
-                    st.write("**Huấn luyện mô hình XGBoost...**")
-                    churn_model_new = XGBClassifier(random_state=42)
-                    param_grid = {
-                        'n_estimators': [100, 200],
-                        'max_depth': [3, 5],
-                        'learning_rate': [0.01, 0.1]
-                    }
-                    grid_search = GridSearchCV(churn_model_new, param_grid, cv=5, scoring='roc_auc', n_jobs=-1)
-                    grid_search.fit(X_train_balanced, y_train_balanced)
-
-                    # Lấy mô hình tốt nhất
-                    churn_model_new = grid_search.best_estimator_
-                    st.write(f"Tham số tốt nhất: {grid_search.best_params_}")
-
-                    # Đánh giá mô hình trên tập kiểm tra
-                    y_pred_proba = churn_model_new.predict_proba(X_test_scaled)[:, 1]
-                    roc_auc = roc_auc_score(y_test, y_pred_proba)
-                    st.write(f"**ROC-AUC trên tập kiểm tra**: {roc_auc:.2f}")
-
-                    # Lưu mô hình và scaler mới
-                    joblib.dump(churn_model_new, 'churn_model_new.pkl')
-                    joblib.dump(scaler, 'scaler_new.pkl')
-                    st.success("Mô hình mới đã được huấn luyện và lưu thành công!", icon="✅")
-
-                    # Cập nhật mô hình và scaler hiện tại
-                    churn_model = churn_model_new
-                    scaler = scaler  # Scaler đã được fit lại trên X_train
-
-                    # Hiển thị phân phối xác suất churn
-                    st.write("**Phân phối xác suất Churn sau khi huấn luyện lại:**")
-                    X_all = scaler.transform(customer_segments[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-                    churn_probs_new = churn_model_new.predict_proba(X_all)[:, 1] * 100
-                    fig, ax = plt.subplots()
-                    ax.hist(churn_probs_new, bins=50)
-                    ax.set_xlabel('Churn Probability (%)')
-                    ax.set_ylabel('Frequency')
-                    ax.set_title('Phân phối Xác suất Churn')
-                    st.pyplot(fig)
-
-                    # Cập nhật customer_segments với xác suất mới
-                    customer_segments['Churn Probability'] = churn_probs_new
-                else:
-                    st.warning("Dữ liệu không có cột 'Churn' để huấn luyện mô hình. Vui lòng kiểm tra dữ liệu!")
 
     def generate_pdf():
         buffer = BytesIO()
