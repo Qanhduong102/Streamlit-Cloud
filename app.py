@@ -1104,14 +1104,27 @@ elif st.session_state.get('authentication_status'):
         table.drawOn(c, 100, y_position - len(data) * 20)
 
         # Thêm phần phân tích theo Giới tính
-        y_position = check_page_break(y_position, 20 + 20 * len(filtered_df['Gender'].unique()))
+        y_position = check_page_break(y_position, 20 + 20 * (len(filtered_df['Gender'].unique()) + 1))  # +1 cho tiêu đề
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "8. Phân tích Theo Giới tính")
         y_position -= 20
         data = [["Giới tính", "Chi tiêu Trung bình ($)"]]
-        for gender, spending in filtered_df.groupby('Gender')['Total Purchase Amount'].mean().items():
-            data.append([gender, f"{spending:,.0f}"])
-    
+
+                # Tính chi tiêu trung bình theo giới tính
+        gender_spending = filtered_df.groupby('Gender')['Total Purchase Amount'].mean()
+
+        # Gỡ lỗi: In chi tiêu trung bình theo giới tính để kiểm tra
+        print("Chi tiêu trung bình theo giới tính:", gender_spending)
+
+        # Ánh xạ giá trị giới tính được mã hóa thành nhãn có ý nghĩa nếu cần
+        gender_mapping = {1: "Nam", 2: "Nữ"}  # Điều chỉnh ánh xạ này dựa trên dữ liệu của bạn
+        for gender, spending in gender_spending.items():
+            # Sử dụng nhãn đã ánh xạ nếu giới tính được mã hóa, nếu không thì dùng trực tiếp
+            gender_label = gender_mapping.get(gender, gender) if isinstance(gender, (int, float)) else gender
+            # Đảm bảo giá trị chi tiêu là số hợp lệ
+            spending_value = int(spending) if not pd.isna(spending) else 0
+            data.append([gender_label, f"{spending_value:,.0f}"])
+
         table = Table(data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
@@ -1123,7 +1136,7 @@ elif st.session_state.get('authentication_status'):
         ]))
         table.wrapOn(c, width, height)
         table.drawOn(c, 100, y_position - len(data) * 20)
-        y_position -= (len(data) * 20 + 20)
+        y_position -= (len(data) * 20 + 20)  # Cập nhật y_position
 
         # Kết thúc và lưu PDF
         c.showPage()
