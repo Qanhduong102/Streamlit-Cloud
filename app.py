@@ -581,11 +581,11 @@ elif st.session_state.get('authentication_status'):
                             st.markdown("#### Tại sao xác suất churn lại thấp?")
                             st.write(f"Xác suất churn chỉ {churn_prob:.2f}% (dưới 25%) cho thấy khách hàng này có các đặc điểm **không giống với những khách hàng rời bỏ trong dữ liệu huấn luyện**. Cụ thể:")
                             reasons = []
-                            if new_customer_data['Total Purchase Amount'].iloc[0] > customer_segments['Total Purchase Amount'].mean():
+                            if customer_segments['Total Purchase Amount'].iloc[0] > customer_segments['Total Purchase Amount'].mean():
                                 reasons.append("- Tổng chi tiêu cao hơn trung bình, cho thấy mức độ gắn kết tốt.")
-                            if new_customer_data['Transaction Count'].iloc[0] > customer_segments['Transaction Count'].mean():
+                            if customer_segments['Transaction Count'].iloc[0] > customer_segments['Transaction Count'].mean():
                                 reasons.append("- Số giao dịch nhiều hơn trung bình, thể hiện sự tương tác thường xuyên.")
-                            if new_customer_data['Returns'].iloc[0] < customer_segments['Returns'].mean():
+                            if customer_segments['Returns'].iloc[0] < customer_segments['Returns'].mean():
                                 reasons.append("- Số lần hoàn trả thấp hơn trung bình, ít dấu hiệu không hài lòng.")
                             for reason in reasons:
                                 st.write(reason)
