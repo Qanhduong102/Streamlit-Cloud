@@ -434,7 +434,7 @@ elif st.session_state.get('authentication_status'):
                     new_total_purchase = st.number_input("Total Purchase Amount ($)", min_value=0.0, step=100.0, format="%.2f", key="new_total_purchase")
                     new_transaction_count = st.number_input("Transaction Count", min_value=0, step=1, format="%d", key="new_transaction_count")
                 with col2:
-                    new_returns = st.number_input("Returns", min_value=0, step=1, format="%d", key="new_returns")
+                    new_returns = st.number_input("Returns", min_value=0, step=1, format="%d", key="new_returns")  
                     new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
                     new_customer_name = st.text_input("Customer Name", key="new_customer_name")
 
@@ -474,9 +474,9 @@ elif st.session_state.get('authentication_status'):
     
                 st.markdown("### Kết quả phân tích khách hàng mới")
                 st.dataframe(new_customer_data.style.format({
-                    'Total Purchase Amount': '{:,.0f}',
-                    'Transaction Count': '{:.0f}',
-                    'Returns': '{:.0f}',
+                    'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                    'Transaction Count': '{:.0f}',       # Số nguyên
+                    'Returns': '{:.0f}',                 # Số nguyên
                     'Age': '{:.0f}'
                 }), use_container_width=True)
 
@@ -528,9 +528,9 @@ elif st.session_state.get('authentication_status'):
                     # Hiển thị toàn bộ thông tin khách hàng
                     st.markdown("### Thông tin chi tiết của khách hàng")
                     st.dataframe(customer_data.style.format({
-                        'Total Purchase Amount': '{:,.0f}',
-                        'Transaction Count': '{:.0f}',
-                        'Returns': '{:.0f}',
+                        'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                        'Transaction Count': '{:.0f}',       # Số nguyên
+                        'Returns': '{:.0f}',                 # Số nguyên
                         'Age': '{:.0f}'
                     }), use_container_width=True)
 
@@ -642,11 +642,29 @@ elif st.session_state.get('authentication_status'):
 
             if 'Churn Probability' in customer_segments.columns:
                 top_churn = customer_segments.sort_values('Churn Probability', ascending=False).head(10)
-                st.dataframe(top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
-                     .style.format({'Churn Probability': '{:.2f}%', 'Total Purchase Amount': '{:,.0f}'}), height=300)
+                st.dataframe(
+                    top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
+                    .style.format({
+                        'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                        'Transaction Count': '{:.0f}',       # Số nguyên
+                        'Returns': '{:.0f}',                 # Số nguyên
+                        'Age': '{:.0f}',                     # Số nguyên
+                        'Churn Probability': '{:.2f}%'       # Hiển thị 2 chữ số thập phân với ký hiệu %
+                    }),
+                    height=300
+                )
             else:
                 top_churn = customer_segments[customer_segments['Churn Prediction'] == 1].head(10)
-                st.dataframe(top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']], height=300)
+                st.dataframe(
+                    top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']]
+                    .style.format({
+                        'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                        'Transaction Count': '{:.0f}',       # Số nguyên
+                        'Returns': '{:.0f}',                 # Số nguyên
+                        'Age': '{:.0f}'                      # Số nguyên
+                    }),
+                    height=300
+                )
 
             st.markdown("---")
             st.write("**Xu hướng Nguy cơ Churn Theo Thời gian**")
