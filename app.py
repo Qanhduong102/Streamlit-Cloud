@@ -528,10 +528,10 @@ elif st.session_state.get('authentication_status'):
                     # Hiển thị toàn bộ thông tin khách hàng
                     st.markdown("### Thông tin chi tiết của khách hàng")
                     st.dataframe(customer_data.style.format({
-                        'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                        'Total Purchase Amount': '{:.0f}',  # Hiển thị 2 chữ số thập phân
                         'Transaction Count': '{:.0f}',       # Số nguyên
                         'Returns': '{:.0f}',                 # Số nguyên
-                        'Age': '{:.0f}'
+                            'Age': '{:.0f}'
                     }), use_container_width=True)
 
                     # Tính toán và giải thích xác suất
@@ -645,7 +645,7 @@ elif st.session_state.get('authentication_status'):
                 st.dataframe(
                     top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
                     .style.format({
-                        'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                        'Total Purchase Amount': '{:.0f}',  # Hiển thị 2 chữ số thập phân
                         'Transaction Count': '{:.0f}',       # Số nguyên
                         'Returns': '{:.0f}',                 # Số nguyên
                         'Age': '{:.0f}',                     # Số nguyên
@@ -658,7 +658,7 @@ elif st.session_state.get('authentication_status'):
                 st.dataframe(
                     top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']]
                     .style.format({
-                        'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                        'Total Purchase Amount': '{:.0f}',  # Hiển thị 2 chữ số thập phân
                         'Transaction Count': '{:.0f}',       # Số nguyên
                         'Returns': '{:.0f}',                 # Số nguyên
                         'Age': '{:.0f}'                      # Số nguyên
