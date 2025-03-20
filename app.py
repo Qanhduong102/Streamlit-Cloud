@@ -1083,14 +1083,15 @@ elif st.session_state.get('authentication_status'):
         y_position -= 20
 
         # 7. Dự đoán Doanh thu
-        y_position = check_page_break(y_position, 20 + 20 * 4)  # 4 dòng cho 3 tháng + header
+        y_position = check_page_break(y_position, 20 + 20 * 4)  # 4 dòng cho 3 tháng + tiêu đề
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "7. Dự đoán Doanh thu 3 Tháng Tới")
         y_position -= 20
         data = [["Tháng", "Doanh thu Dự đoán ($)"]]
         for i, pred in enumerate(future_pred):
-            data.append([f"Tháng {i+1}", f"{int(pred):,.0f}"])
-    
+            pred_value = int(pred) if not pd.isna(pred) else 0
+            data.append([f"Tháng {i+1}", f"{pred_value:,.0f}"])
+
         table = Table(data)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
@@ -1102,15 +1103,16 @@ elif st.session_state.get('authentication_status'):
         ]))
         table.wrapOn(c, width, height)
         table.drawOn(c, 100, y_position - len(data) * 20)
+        y_position -= (len(data) * 20 + 20)  # Cập nhật y_position để tạo khoảng cách
 
-        # Thêm phần phân tích theo Giới tính
+        # 8. Phân tích Theo Giới tính
         y_position = check_page_break(y_position, 20 + 20 * (len(filtered_df['Gender'].unique()) + 1))  # +1 cho tiêu đề
         c.setFont("TimesNewRoman-Bold", 14)
         c.drawString(100, y_position, "8. Phân tích Theo Giới tính")
         y_position -= 20
         data = [["Giới tính", "Chi tiêu Trung bình ($)"]]
 
-                # Tính chi tiêu trung bình theo giới tính
+        # Tính chi tiêu trung bình theo giới tính
         gender_spending = filtered_df.groupby('Gender')['Total Purchase Amount'].mean()
 
         # Gỡ lỗi: In chi tiêu trung bình theo giới tính để kiểm tra
@@ -1119,9 +1121,7 @@ elif st.session_state.get('authentication_status'):
         # Ánh xạ giá trị giới tính được mã hóa thành nhãn có ý nghĩa nếu cần
         gender_mapping = {1: "Nam", 2: "Nữ"}  # Điều chỉnh ánh xạ này dựa trên dữ liệu của bạn
         for gender, spending in gender_spending.items():
-            # Sử dụng nhãn đã ánh xạ nếu giới tính được mã hóa, nếu không thì dùng trực tiếp
             gender_label = gender_mapping.get(gender, gender) if isinstance(gender, (int, float)) else gender
-            # Đảm bảo giá trị chi tiêu là số hợp lệ
             spending_value = int(spending) if not pd.isna(spending) else 0
             data.append([gender_label, f"{spending_value:,.0f}"])
 
@@ -1136,21 +1136,7 @@ elif st.session_state.get('authentication_status'):
         ]))
         table.wrapOn(c, width, height)
         table.drawOn(c, 100, y_position - len(data) * 20)
-        y_position -= (len(data) * 20 + 20)  # Cập nhật y_position
-
-        # Kết thúc và lưu PDF
-        c.showPage()
-        c.save()
-        buffer.seek(0)
-        return buffer
-
-    with st.sidebar:
-        st.markdown("---")
-        if st.button("📥 Xuất Báo cáo PDF", key="export", use_container_width=True):
-            pdf_buffer = generate_pdf()
-            st.download_button(label="Tải Báo cáo PDF", data=pdf_buffer, file_name="purchase_analysis_report.pdf", 
-                           mime="application/pdf", use_container_width=True)
-            st.success("Báo cáo đã sẵn sàng để tải!", icon="📄")
+        y_position -= (len(data) * 20 + 20)  # Cập nhật y_position)
 
     # Footer
     st.markdown("""
