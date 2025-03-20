@@ -575,30 +575,6 @@ elif st.session_state.get('authentication_status'):
                 
                         for exp in explanations:
                             st.write(exp)
-                        
-                        # Thêm giải thích cụ thể nếu xác suất dưới 25%
-                        if churn_prob < 25:
-                            st.markdown("#### Tại sao xác suất churn lại thấp?")
-                            st.write(f"Xác suất churn chỉ {churn_prob:.2f}% (dưới 25%) cho thấy khách hàng này có các đặc điểm **không giống với những khách hàng rời bỏ trong dữ liệu huấn luyện**. Cụ thể:")
-                            reasons = []
-                            if customer_segments['Total Purchase Amount'].iloc[0] > customer_segments['Total Purchase Amount'].mean():
-                                reasons.append("- Tổng chi tiêu cao hơn trung bình, cho thấy mức độ gắn kết tốt.")
-                            if customer_segments['Transaction Count'].iloc[0] > customer_segments['Transaction Count'].mean():
-                                reasons.append("- Số giao dịch nhiều hơn trung bình, thể hiện sự tương tác thường xuyên.")
-                            if customer_segments['Returns'].iloc[0] < customer_segments['Returns'].mean():
-                                reasons.append("- Số lần hoàn trả thấp hơn trung bình, ít dấu hiệu không hài lòng.")
-                            for reason in reasons:
-                                st.write(reason)
-                            if not reasons:
-                                st.write("- Không có yếu tố cụ thể nào nổi bật, nhưng sự kết hợp các đặc trưng cho thấy nguy cơ rất thấp.")
-
-                            # Nếu mô hình có feature importance (ví dụ Random Forest)
-                            if hasattr(churn_model, 'feature_importances_'):
-                                st.markdown("#### Tầm quan trọng của các đặc trưng trong mô hình")
-                                feature_names = ['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']
-                                importances = churn_model.feature_importances_
-                                for name, imp in zip(feature_names, importances):
-                                    st.write(f"- {name}: {imp*100:.2f}% ảnh hưởng đến dự đoán")
                 
                         # Ngưỡng phân loại
                         st.write("\n**Cách phân loại nguy cơ:**")
