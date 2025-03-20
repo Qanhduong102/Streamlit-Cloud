@@ -474,7 +474,7 @@ elif st.session_state.get('authentication_status'):
     
                 st.markdown("### Kết quả phân tích khách hàng mới")
                 st.dataframe(new_customer_data.style.format({
-                    'Total Purchase Amount': '{:,.2f}',  # Hiển thị 2 chữ số thập phân
+                    'Total Purchase Amount': '{:.0f}',  # Hiển thị 2 chữ số thập phân
                     'Transaction Count': '{:.0f}',       # Số nguyên
                     'Returns': '{:.0f}',                 # Số nguyên
                     'Age': '{:.0f}'
