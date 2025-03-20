@@ -431,7 +431,17 @@ elif st.session_state.get('authentication_status'):
                 col1, col2 = st.columns(2)
                 with col1:
                     new_customer_id = st.number_input("Customer ID", min_value=1, step=1, format="%d", key="new_customer_id")
-                    new_total_purchase = st.number_input("Total Purchase Amount ($)", min_value=0.0, step=100.0, format="%.2f", key="new_total_purchase")
+                    # Sửa định dạng cho Total Purchase Amount
+                    new_total_purchase = st.number_input(
+                        "Total Purchase Amount ($)",
+                        min_value=0.0,
+                        step=100.0,
+                        format="%.2f",  # Giữ format này để cho phép nhập số thập phân
+                        key="new_total_purchase"
+                    )
+                    # Nếu giá trị là số nguyên (ví dụ: 0.00), chuyển thành số nguyên
+                    if new_total_purchase.is_integer():
+                         new_total_purchase = int(new_total_purchase)
                     new_transaction_count = st.number_input("Transaction Count", min_value=0, step=1, format="%d", key="new_transaction_count")
                 with col2:
                     new_returns = st.number_input("Returns", min_value=0, step=1, format="%d", key="new_returns")  
