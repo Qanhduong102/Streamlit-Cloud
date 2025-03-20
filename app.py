@@ -537,8 +537,8 @@ elif st.session_state.get('authentication_status'):
                     # Tính toán và giải thích xác suất
                     if hasattr(churn_model, 'predict_proba'):
                         churn_prob = churn_model.predict_proba(X)[0][1] * 100
-                        prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 23 else 
-                                 "có nguy cơ rời bỏ" if churn_prob >= 21 else 
+                        prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 75 else 
+                                 "có nguy cơ rời bỏ" if churn_prob >= 50 else 
                                  "không có nguy cơ rời bỏ")
                         st.success(f"Khách hàng {customer_id} - {customer_name} "
                           f"{prediction_text} (Xác suất: {churn_prob:.2f}%)", icon="✅")
@@ -578,9 +578,9 @@ elif st.session_state.get('authentication_status'):
                 
                         # Ngưỡng phân loại
                         st.write("\n**Cách phân loại nguy cơ:**")
-                        st.write("- ≥ 23%: Nguy cơ rời bỏ cao")
-                        st.write("- 21%: Có nguy cơ rời bỏ")
-                        st.write("- < 21%: Không có nguy cơ rời bỏ")
+                        st.write("- ≥ 75%: Nguy cơ rời bỏ cao")
+                        st.write("- 50-74%: Có nguy cơ rời bỏ")
+                        st.write("- < 50%: Không có nguy cơ rời bỏ")
             
                     else:
                         prediction_text = "có nguy cơ rời bỏ" if churn_pred else "không rời bỏ"
