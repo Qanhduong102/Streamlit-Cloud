@@ -1137,7 +1137,19 @@ elif st.session_state.get('authentication_status'):
         table.wrapOn(c, width, height)
         table.drawOn(c, 100, y_position - len(data) * 20)
         y_position -= (len(data) * 20 + 20)  # Cập nhật y_position)
+        # Kết thúc và lưu PDF
+        c.showPage()
+        c.save()
+        buffer.seek(0)
+        return buffer
 
+    with st.sidebar:
+        st.markdown("---")
+        if st.button("📥 Xuất Báo cáo PDF", key="export", use_container_width=True):
+            pdf_buffer = generate_pdf()
+            st.download_button(label="Tải Báo cáo PDF", data=pdf_buffer, file_name="purchase_analysis_report.pdf", 
+                           mime="application/pdf", use_container_width=True)
+            st.success("Báo cáo đã sẵn sàng để tải!", icon="📄")
     # Footer
     st.markdown("""
         <div class="footer">
