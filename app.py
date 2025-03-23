@@ -249,7 +249,7 @@ elif st.session_state.get('authentication_status'):
 
         # Tabs
         tabs = st.tabs(["📈 Phân tích Cơ bản", "👥 Phân khúc Khách hàng", "⚠️ Dự đoán Churn", "📅 Xu hướng Thời gian", 
-                "👤 Chi tiết Khách hàng", "📦 Phân tích Hoàn trả", "🤖 So sánh Mô hình"])
+                "👤 Chi tiết Khách hàng", "📦 Phân tích Hoàn trả"])
 
         # Tab 1: Phân tích Cơ bản
         with tabs[0]:
@@ -690,113 +690,6 @@ elif st.session_state.get('authentication_status'):
                                  height=400)
             st.plotly_chart(fig_compare, use_container_width=True, key="chart_return_vs_revenue")  # Sửa fig6 thành fig_compare
             st.write("**Gợi ý**: Danh mục có doanh thu cao nhưng tỷ lệ hoàn trả lớn cần cải thiện chất lượng sản phẩm.")
-        
-        # Tab 7: So sánh Mô hình
-        with tabs[6]:
-            st.subheader("🤖 So sánh Các Mô hình Dự đoán")
-            st.markdown("Phân tích các mô hình hiện tại để đánh giá hiệu quả và khả năng áp dụng chéo.")
-
-            # Kiểm tra xem mô hình đã được tải chưa
-            if churn_model is None or revenue_model is None or scaler is None:
-                st.error("Không thể tải một hoặc nhiều mô hình. Vui lòng kiểm tra file mô hình!")
-            else:
-                # Thông tin cơ bản về các mô hình
-                st.markdown("### 1. Thông tin Mô hình Hiện tại")
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write("**Mô hình Dự đoán Churn (`churn_model`)**")
-                    st.write(f"- Loại: {type(churn_model).__name__}")
-                    st.write("- Mục đích: Dự đoán khả năng khách hàng rời bỏ (churn).")
-                    st.write("- Input: Tổng chi tiêu, Số giao dịch, Số lần hoàn trả, Độ tuổi.")
-                    st.write("- Output: 0 (không churn) hoặc 1 (churn), hoặc xác suất nếu hỗ trợ `predict_proba`.")
-                with col2:
-                    st.write("**Mô hình Dự đoán Doanh thu (`revenue_model`)**")
-                    st.write(f"- Loại: {type(revenue_model).__name__}")
-                    st.write("- Mục đích: Dự đoán doanh thu tương lai dựa trên xu hướng thời gian.")
-                    st.write("- Input: Số tháng (dữ liệu chuỗi thời gian).")
-                    st.write("- Output: Giá trị doanh thu dự đoán (số thực).")
-
-                # So sánh khả năng áp dụng chéo
-                st.markdown("### 2. Khả năng Áp dụng Chéo")
-                st.write("**Câu hỏi: Có thể dùng `churn_model` cho dự đoán doanh thu hoặc `revenue_model` cho dự đoán churn không?**")
-        
-                with st.expander("Phân tích chi tiết"):
-                    st.write("#### a) Dùng `churn_model` cho Dự đoán Doanh thu")
-                    st.write("- **Kết quả**: Không khả thi.")
-                    st.write("- **Lý do**: `churn_model` được huấn luyện để phân loại (classification), trả về nhãn 0/1 hoặc xác suất, không phù hợp để dự đoán giá trị liên tục như doanh thu.")
-                    st.write("- **Ưu điểm nếu khả thi**: Có thể tận dụng dữ liệu khách hàng chi tiết.")
-                    st.write("- **Nhược điểm thực tế**: Sai mục đích thiết kế, kết quả không có ý nghĩa kinh doanh.")
-            
-                    st.write("#### b) Dùng `revenue_model` cho Dự đoán Churn")
-                    st.write("- **Kết quả**: Không khả thi.")
-                    st.write("- **Lý do**: `revenue_model` là mô hình hồi quy (regression), dự đoán giá trị số (doanh thu), không thể phân loại khách hàng thành churn hay không churn.")
-                    st.write("- **Ưu điểm nếu khả thi**: Dễ dàng mở rộng cho dữ liệu chuỗi thời gian.")
-                    st.write("- **Nhược điểm thực tế**: Không phù hợp với bài toán phân loại nhị phân.")
-
-                # So sánh ưu điểm và nhược điểm
-                st.markdown("### 3. Ưu điểm và Nhược điểm")
-                col3, col4 = st.columns(2)
-                with col3:
-                    st.write("**`churn_model`**")
-                    st.write("**Ưu điểm:**")
-                    st.write("- Chính xác trong việc dự đoán hành vi khách hàng.")
-                    st.write("- Có thể cung cấp xác suất (nếu hỗ trợ `predict_proba`), giúp đánh giá mức độ nguy cơ.")
-                    st.write("**Nhược điểm:**")
-                    st.write("- Yêu cầu dữ liệu đầu vào chi tiết (Total Purchase Amount, Transaction Count, Returns, Age).")
-                    st.write("- Không linh hoạt cho các bài toán ngoài phân loại.")
-                with col4:
-                    st.write("**`revenue_model`**")
-                    st.write("**Ưu điểm:**")
-                    st.write("- Đơn giản, chỉ cần dữ liệu chuỗi thời gian (số tháng).")
-                    st.write("- Hữu ích cho dự báo tài chính dài hạn.")
-                    st.write("**Nhược điểm:**")
-                    st.write("- Không tận dụng được thông tin chi tiết của khách hàng.")
-                    st.write("- Độ chính xác phụ thuộc vào xu hướng lịch sử, không thích nghi với thay đổi đột ngột.")
-
-            # So sánh giá trị trả về
-            st.markdown("### 4. So sánh Giá trị Trả về")
-            st.write("Thử nghiệm trên một mẫu dữ liệu để thấy sự khác biệt:")
-
-            # Tạo dữ liệu mẫu
-            sample_data = pd.DataFrame({
-                'Total Purchase Amount': [5000],
-                'Transaction Count': [10],
-                'Returns': [2],
-                'Age': [35]
-            })
-            sample_time = np.array([[len(monthly_revenue)]])  # Dùng tháng hiện tại cho revenue_model
-
-            # Dự đoán với cả hai mô hình
-            X_sample = scaler.transform(sample_data)
-            churn_pred = churn_model.predict(X_sample)[0]
-            revenue_pred = revenue_model.predict(sample_time)[0]
-
-            if hasattr(churn_model, 'predict_proba'):
-                churn_prob = churn_model.predict_proba(X_sample)[0][1] * 100
-                st.write(f"- **`churn_model`**: Dự đoán = {churn_pred} (Xác suất churn = {churn_prob:.2f}%)")
-            else:
-                st.write(f"- **`churn_model`**: Dự đoán = {churn_pred} (0: Không churn, 1: Churn)")
-                st.write(f"- **`revenue_model`**: Dự đoán doanh thu = {revenue_pred:,.0f} $")
-
-                st.write("**Nhận xét**:")
-                st.write("- Giá trị từ `churn_model` mang tính phân loại (0/1 hoặc xác suất), phù hợp để đánh giá hành vi.")
-                st.write("- Giá trị từ `revenue_model` là số thực, phù hợp cho dự báo tài chính, không liên quan đến churn.")
-
-                # Đề xuất lựa chọn mô hình
-                st.markdown("### 5. Đề xuất Lựa chọn Mô hình")
-                st.write("**Tại sao chọn mô hình hiện tại cho phần tương ứng?**")
-                st.write("- **`churn_model` cho Dự đoán Churn**:")
-                st.write("  - Lý do: Được thiết kế chuyên biệt cho bài toán phân loại nhị phân, tối ưu để phát hiện nguy cơ rời bỏ.")
-                st.write("  - Đề xuất: Tiếp tục sử dụng hoặc nâng cấp với các thuật toán như Random Forest, XGBoost nếu cần độ chính xác cao hơn.")
-                st.write("- **`revenue_model` cho Dự đoán Doanh thu**:")
-                st.write("  - Lý do: Phù hợp với bài toán hồi quy chuỗi thời gian, đơn giản và hiệu quả cho xu hướng dài hạn.")
-                st.write("  - Đề xuất: Có thể thử mô hình ARIMA hoặc LSTM nếu muốn dự đoán chính xác hơn với dữ liệu phức tạp.")
-
-                # Gợi ý cải tiến
-                st.markdown("### 6. Gợi ý Cải tiến")
-                st.write("- **Kết hợp mô hình**: Tạo một pipeline kết hợp cả churn và revenue để dự đoán doanh thu tiềm năng bị mất do churn.")
-                st.write("- **Thử nghiệm mô hình khác**: So sánh với các thuật toán khác (ví dụ: SVM, Neural Networks) để tìm mô hình tối ưu hơn.")
-                st.write("- **Đánh giá định lượng**: Thêm các chỉ số như accuracy, RMSE để so sánh hiệu suất cụ thể.")
 
     def generate_pdf():
         buffer = BytesIO()
