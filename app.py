@@ -15,7 +15,7 @@ from reportlab.platypus import Table, TableStyle
 import os
 from google.oauth2 import service_account
 import gspread
-import json  # Đảm bảo import json để parse credentials_json
+import json  
 from lifelines import KaplanMeierFitter
 import joblib
 import matplotlib.pyplot as plt
@@ -144,7 +144,7 @@ elif st.session_state.get('authentication_status'):
                     clean_segment_data.append(clean_row)
                 customer_segments = pd.DataFrame(clean_segment_data)
                 required_segment_cols = ['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count',
-                                  'Returns', 'Age', 'Gender', 'Cluster', 'Churn Probability']
+                                  'Returns', 'Age', 'Gender', 'Cluster']
                 missing_segment_cols = [col for col in required_segment_cols if col not in customer_segments.columns]
                 if missing_segment_cols:
                     st.error(f"Các cột thiếu trong Customer Segments từ Google Sheets: {missing_segment_cols}")
@@ -169,7 +169,7 @@ elif st.session_state.get('authentication_status'):
                 df['Day of Week'] = df['Day of Week'].astype(str).fillna('Unknown')
                 customer_segments = pd.read_csv('customer_segments.csv')
                 required_segment_cols = ['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count',
-                                  'Returns', 'Age', 'Gender', 'Cluster', 'Churn Probability']
+                                  'Returns', 'Age', 'Gender', 'Cluster']
                 missing_segment_cols = [col for col in required_segment_cols if col not in customer_segments.columns]
                 if missing_segment_cols:
                     st.error(f"Các cột thiếu trong customer_segments.csv: {missing_segment_cols}")
@@ -192,7 +192,7 @@ elif st.session_state.get('authentication_status'):
             df['Day of Week'] = df['Day of Week'].astype(str).fillna('Unknown')
             customer_segments = pd.read_csv('customer_segments.csv')
             required_segment_cols = ['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count',
-                              'Returns', 'Age', 'Gender', 'Cluster', 'Churn Probability']
+                              'Returns', 'Age', 'Gender', 'Cluster']
             missing_segment_cols = [col for col in required_segment_cols if col not in customer_segments.columns]
             if missing_segment_cols:
                 st.error(f"Các cột thiếu trong customer_segments.csv: {missing_segment_cols}")
@@ -426,282 +426,150 @@ elif st.session_state.get('authentication_status'):
 
         # Tab 3: Dự đoán Churn
         with tabs[2]:
-            st.markdown("### Nhập thông tin khách hàng mới")
+            st.subheader("Dự đoán Churn")
+
+            # Định nghĩa factors để sử dụng trong toàn bộ tab
+            factors = [
+                ('Total Purchase Amount', 'Tổng chi tiêu', 'thấp hơn', 'cao hơn'),
+                ('Transaction Count', 'Số giao dịch', 'ít hơn', 'nhiều hơn'),
+                ('Returns', 'Số lần hoàn trả', 'cao hơn', 'thấp hơn'),
+                ('Age', 'Độ tuổi', 'trẻ hơn', 'lớn hơn')
+            ]
+
+            # Biểu mẫu khách hàng mới
             with st.form(key='new_customer_form'):
+                st.markdown("### Nhập thông tin khách hàng mới")
                 col1, col2 = st.columns(2)
+
                 with col1:
-                    new_customer_id = st.number_input("Customer ID", min_value=1, step=1, format="%d", key="new_customer_id")
-                    # Sửa định dạng cho Total Purchase Amount
+                    new_customer_name = st.text_input("Customer Name", key="new_customer_name")
+                    new_gender = st.selectbox("Gender", options=['Male', 'Female', 'Other'], key="new_gender")
                     new_total_purchase = st.number_input(
                         "Total Purchase Amount ($)",
                         min_value=0.0,
                         step=100.0,
-                        format="%.2f",  # Giữ format này để cho phép nhập số thập phân
+                        format="%.2f",
                         key="new_total_purchase"
                     )
-                    # Nếu giá trị là số nguyên (ví dụ: 0.00), chuyển thành số nguyên
                     if new_total_purchase.is_integer():
-                         new_total_purchase = int(new_total_purchase)
-                    new_transaction_count = st.number_input("Transaction Count", min_value=0, step=1, format="%d", key="new_transaction_count")
-                with col2:
-                    new_returns = st.number_input("Returns", min_value=0, step=1, format="%d", key="new_returns")  
-                    new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
-                    new_customer_name = st.text_input("Customer Name", key="new_customer_name")
+                        new_total_purchase = int(new_total_purchase)
 
-                    # Đặt nút Phân tích và Xóa trong cột riêng
+                with col2:
+                    new_transaction_count = st.number_input("Transaction Count", min_value=0, step=1, format="%d", key="new_transaction_count")
+                    new_returns = st.number_input("Returns", min_value=0, step=1, format="%d", key="new_returns")
+                    new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
+
                 col1, col2 = st.columns(2)
                 with col1:
-                    analyze_button = st.form_submit_button("Phân tích nguy cơ Churn", use_container_width=True)
+                    analyze_button = st.form_submit_button("Dự đoán Churn", use_container_width=True)
                 with col2:
-                    save_button = st.form_submit_button("Xóa", use_container_width=True)
+                    clear_button = st.form_submit_button("Xóa", use_container_width=True)
 
-            # Xử lý khi nhấn nút Xóa
-            if save_button:
-                # Reset các giá trị trong session state về mặc định
-                st.session_state.new_customer_id = 1
+            # Xử lý nút Xóa
+            if clear_button:
+                st.session_state.new_customer_name = ""
+                st.session_state.new_gender = "Male"
                 st.session_state.new_total_purchase = 0.0
                 st.session_state.new_transaction_count = 0
                 st.session_state.new_returns = 0
                 st.session_state.new_age = 18
-                st.session_state.new_customer_name = ""
-                st.experimental_rerun()  # Tải lại form để áp dụng giá trị mới
-            
-            # Xử lý khi nhấn nút Phân tích
+                st.experimental_rerun()
+
+            # Xử lý nút Dự đoán
             if analyze_button:
-                # Tạo DataFrame cho khách hàng mới
                 new_customer_data = pd.DataFrame({
-                    'Customer ID': [new_customer_id],
                     'Customer Name': [new_customer_name],
+                    'Gender': [new_gender],
                     'Total Purchase Amount': [new_total_purchase],
                     'Transaction Count': [new_transaction_count],
                     'Returns': [new_returns],
                     'Age': [new_age]
                 })
-    
-                # Chuẩn hóa dữ liệu và dự đoán
-                X_new = scaler.transform(new_customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-                churn_pred = churn_model.predict(X_new)[0]
-    
+
+                X_new_df = new_customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']]
+                X_new_scaled = pd.DataFrame(
+                    scaler.transform(X_new_df),
+                    columns=X_new_df.columns
+                )
+                churn_pred = churn_model.predict(X_new_scaled)
+
                 st.markdown("### Kết quả phân tích khách hàng mới")
                 st.dataframe(new_customer_data.style.format({
                     'Total Purchase Amount': lambda x: f"{int(x):,}" if x.is_integer() else f"{x:,.2f}",
-                    'Transaction Count': '{:.0f}',       # Số nguyên
-                    'Returns': '{:.0f}',                 # Số nguyên
+                    'Transaction Count': '{:.0f}',
+                    'Returns': '{:.0f}',
                     'Age': '{:.0f}'
                 }), use_container_width=True)
 
-                # Dự đoán và giải thích
-                if hasattr(churn_model, 'predict_proba'):
-                    churn_prob = churn_model.predict_proba(X_new)[0][1] * 100
-                    prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 23 else 
-                          "có nguy cơ rời bỏ" if churn_prob >= 21 else 
-                          "không có nguy cơ rời bỏ")
-                    st.success(f"Khách hàng {new_customer_id} - {new_customer_name} "
-                            f"{prediction_text} (Xác suất: {churn_prob:.2f}%)", icon="✅")
-        
-                    # Giải thích chi tiết
-                    st.markdown("#### Giải thích dự đoán")
-                    st.write(f"Xác suất churn {churn_prob:.2f}% dựa trên:")
-                    factors = [
-                        ('Total Purchase Amount', 'Tổng chi tiêu', 'thấp hơn', 'cao hơn'),
-                        ('Transaction Count', 'Số giao dịch', 'ít hơn', 'nhiều hơn'),
-                        ('Returns', 'Số lần hoàn trả', 'cao hơn', 'thấp hơn'),
-                        ('Age', 'Độ tuổi', 'trẻ hơn', 'lớn hơn')
-                    ]
-        
-                    for col, name, low_text, high_text in factors:
-                        value = new_customer_data[col].iloc[0]
-                        mean_value = customer_segments[col].mean()
-                        diff_percent = ((value - mean_value) / mean_value) * 100
-                        comparison = high_text if value > mean_value else low_text
-                        impact = "tăng nguy cơ churn" if (col == 'Returns' and value > mean_value) or (col != 'Returns' and value < mean_value) else "giảm nguy cơ churn"
-                        st.write(f"- {name}: {value:,.0f} ({comparison} trung bình {mean_value:,.0f} khoảng {abs(diff_percent):.1f}%), {impact}")
-                else:
-                    prediction_text = "có nguy cơ rời bỏ" if churn_pred else "không rời bỏ"
-                    st.success(f"Khách hàng {new_customer_id} - {new_customer_name} {prediction_text}", icon="✅")
+                prediction_text = "có nguy cơ rời bỏ" if churn_pred == 1 else "không có nguy cơ rời bỏ"
+                st.success(f"Khách hàng {new_customer_name} {prediction_text}", icon="✅")
 
-            st.subheader("Dự đoán Khách hàng Rời bỏ")
+                # Giải thích dự đoán
+                st.markdown("#### Giải thích dự đoán")
+                customer_agg = df.groupby('Customer ID').agg({
+                    'Total Purchase Amount': 'sum',
+                    'Purchase Date': 'count',
+                    'Returns': 'mean',
+                    'Age': 'mean'
+                }).rename(columns={'Purchase Date': 'Transaction Count'})
+                for col, name, low_text, high_text in factors:
+                    value = new_customer_data[col].iloc[0]
+                    mean_value = customer_agg[col].mean()
+                    comparison = high_text if value > mean_value else low_text
+                    impact = "tăng nguy cơ rời bỏ" if (col == 'Returns' and value > mean_value) or (col != 'Returns' and value < mean_value) else "giảm nguy cơ rời bỏ"
+                    st.write(f"- {name}: {value:,.0f} ({comparison} trung bình {mean_value:,.0f}), {impact}")
 
-            col1, col2 = st.columns([3, 1], vertical_alignment="center")
+            # Dự đoán Churn cho khách hàng hiện có
+            st.subheader("Dự đoán Churn cho khách hàng hiện có")
+            col1, col2 = st.columns([3, 1])
             with col1:
                 customer_id = st.number_input("Nhập Customer ID:", min_value=1, step=1, format="%d", key="customer_id_input")
             with col2:
-                predict_button = st.button("Dự đoán", key="predict_button", use_container_width=True)
+                predict_button = st.button("Xem", key="predict_button", use_container_width=True)
 
             if predict_button:
-                customer_data = customer_segments[customer_segments['Customer ID'] == customer_id]
+                customer_data = df[df['Customer ID'] == customer_id]
                 if not customer_data.empty:
-                    X = scaler.transform(customer_data[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-                    churn_pred = churn_model.predict(X)[0]
-                    customer_name = customer_data['Customer Name'].iloc[0] if 'Customer Name' in customer_data.columns else 'Unknown'
-            
-                    # Hiển thị toàn bộ thông tin khách hàng
-                    st.markdown("### Thông tin chi tiết của khách hàng")
-                    st.dataframe(customer_data.style.format({
-                        'Total Purchase Amount': '{:.0f}',  # Hiển thị 2 chữ số thập phân
-                        'Transaction Count': '{:.0f}',       # Số nguyên
-                        'Returns': '{:.0f}',                 # Số nguyên
-                            'Age': '{:.0f}'
+                    customer_agg = pd.DataFrame({
+                        'Customer ID': [customer_id],
+                        'Customer Name': [customer_data['Customer Name'].iloc[0]],
+                        'Total Purchase Amount': [customer_data['Total Purchase Amount'].sum()],
+                        'Transaction Count': [len(customer_data)],
+                        'Returns': [customer_data['Returns'].mean()],
+                        'Age': [customer_data['Age'].mean()],
+                        'Churn': [customer_data['Churn'].iloc[0]]  # Lấy giá trị Churn từ dữ liệu
+                    })
+
+                    st.markdown("### Chi tiết khách hàng hiện có")
+                    st.dataframe(customer_agg.style.format({
+                        'Total Purchase Amount': '{:,.0f}',
+                        'Transaction Count': '{:.0f}',
+                        'Returns': '{:.0f}',
+                        'Age': '{:.0f}',
+                        'Churn': '{:.0f}'
                     }), use_container_width=True)
 
-                    # Tính toán và giải thích xác suất
-                    if hasattr(churn_model, 'predict_proba'):
-                        churn_prob = churn_model.predict_proba(X)[0][1] * 100
-                        prediction_text = ("có nguy cơ rời bỏ cao" if churn_prob >= 23 else 
-                                 "có nguy cơ rời bỏ" if churn_prob >= 21 else 
-                                 "không có nguy cơ rời bỏ")
-                        st.success(f"Khách hàng {customer_id} - {customer_name} "
-                          f"{prediction_text} (Xác suất: {churn_prob:.2f}%)", icon="✅")
-                
-                        # Giải thích chi tiết xác suất
-                        st.markdown("### Giải thích dự đoán")
-                        st.write(f"Xác suất churn {churn_prob:.2f}% được tính dựa trên các yếu tố:")
-                
-                        # So sánh với giá trị trung bình
-                        factors = [
-                            ('Total Purchase Amount', 'Tổng chi tiêu', 'thấp hơn', 'cao hơn'),
-                            ('Transaction Count', 'Số giao dịch', 'ít hơn', 'nhiều hơn'),
-                            ('Returns', 'Số lần hoàn trả', 'cao hơn', 'thấp hơn'),
-                            ('Age', 'Độ tuổi', 'trẻ hơn', 'lớn hơn')
-                        ]
-                
-                        explanations = []
-                        for col, name, low_text, high_text in factors:
-                            value = customer_data[col].iloc[0]
-                            mean_value = customer_segments[col].mean()
-                            diff_percent = ((value - mean_value) / mean_value) * 100
-                    
-                            if col == 'Returns':
-                                impact = "tăng nguy cơ churn" if value > mean_value else "giảm nguy cơ churn"
-                                comparison = high_text if value > mean_value else low_text
-                            else:
-                                impact = "giảm nguy cơ churn" if value > mean_value else "tăng nguy cơ churn"
-                                comparison = high_text if value > mean_value else low_text
-                        
-                            explanations.append(
-                                f"- {name}: {value:,.0f} ({comparison} trung bình {mean_value:,.0f} khoảng {abs(diff_percent):.1f}%), "
-                                f"{impact}"
-                            )
-                
-                        for exp in explanations:
-                            st.write(exp)
-                
-                        # Ngưỡng phân loại
-                        st.write("\n**Cách phân loại nguy cơ:**")
-                        st.write("- ≥ 23%: Nguy cơ rời bỏ cao")
-                        st.write("- 21-22%: Có nguy cơ rời bỏ")
-                        st.write("- < 20%: Không có nguy cơ rời bỏ")
-            
-                    else:
-                        prediction_text = "có nguy cơ rời bỏ" if churn_pred else "không rời bỏ"
-                        st.success(f"Khách hàng {customer_id} - {customer_name} {prediction_text}", icon="✅")
+                    churn_value = customer_agg['Churn'].iloc[0]
+                    prediction_text = "đã rời bỏ" if churn_value == 1 else "chưa rời bỏ"
+                    customer_name = customer_agg['Customer Name'].iloc[0]
+                    st.success(f"Khách hàng {customer_id} - {customer_name} {prediction_text}", icon="✅")
 
-                    # Phân tích nguyên nhân tiềm năng
-                    if churn_pred or (hasattr(churn_model, 'predict_proba') and churn_prob >= 50):
-                        st.markdown("### Nguyên nhân tiềm năng")
-                        reasons = []
-                        if customer_data['Transaction Count'].iloc[0] < customer_segments['Transaction Count'].mean():
-                            reasons.append("- Tần suất giao dịch thấp hơn trung bình")
-                        if customer_data['Returns'].iloc[0] > customer_segments['Returns'].mean():
-                            reasons.append("- Tỷ lệ hoàn trả cao hơn trung bình")
-                        if customer_data['Total Purchase Amount'].iloc[0] < customer_segments['Total Purchase Amount'].mean():
-                            reasons.append("- Chi tiêu thấp hơn trung bình")
-                
-                        if reasons:
-                            for reason in reasons:
-                                st.write(reason)
-                        else:
-                            st.write("- Không có nguyên nhân cụ thể được xác định")
-
-                    # Gợi ý hành động
-                    if 'filtered_df' in globals() and not filtered_df.empty:
-                        customer_filtered = filtered_df[filtered_df['Customer ID'] == customer_id]
-                        if not customer_filtered.empty:
-                            last_purchase = customer_filtered['Purchase Date'].max()
-                            fav_category = customer_filtered['Product Category'].mode()[0] if not customer_filtered['Product Category'].mode().empty else 'Unknown'
-                            days_inactive = (pd.Timestamp.now() - last_purchase).days
-                            avg_spending = customer_data['Total Purchase Amount'].mean()
-                            potential_loss = avg_spending * 12
-
-                            st.markdown("### Phân tích bổ sung và Gợi ý")
-                            st.write(f"**Doanh thu tiềm năng bị mất**: {potential_loss:,.0f} $ (ước tính 12 tháng)")
-                            st.write(f"**Thông tin hành vi:**")
-                            st.write(f"- Lần mua cuối: {days_inactive} ngày trước")
-                            st.write(f"- Danh mục yêu thích: {fav_category}")
-                            st.write("**Gợi ý hành động:**")
-                            if days_inactive > 30:
-                                st.write(f"- Gửi email ưu đãi 20% cho {fav_category} để tái kích hoạt")
-                            else:
-                                st.write(f"- Tặng mã giảm giá 10% cho {fav_category} để khuyến khích mua sắm")
-                    else:
-                        st.warning("Dữ liệu filtered_df không khả dụng để tính toán chi tiết.")
+                    # Giải thích dựa trên dữ liệu
+                    st.markdown("#### Giải thích")
+                    all_customer_agg = df.groupby('Customer ID').agg({
+                        'Total Purchase Amount': 'sum',
+                        'Purchase Date': 'count',
+                        'Returns': 'mean',
+                        'Age': 'mean'
+                    }).rename(columns={'Purchase Date': 'Transaction Count'})
+                    for col, name, low_text, high_text in factors:
+                        value = customer_agg[col].iloc[0]
+                        mean_value = all_customer_agg[col].mean()
+                        comparison = high_text if value > mean_value else low_text
+                        impact = "có thể tăng nguy cơ rời bỏ" if (col == 'Returns' and value > mean_value) or (col != 'Returns' and value < mean_value) else "có thể giảm nguy cơ rời bỏ"
+                        st.write(f"- {name}: {value:,.0f} ({comparison} trung bình {mean_value:,.0f}), {impact}")
                 else:
                     st.error(f"Không tìm thấy khách hàng {customer_id}!", icon="❌")
-
-            st.markdown("---")
-            st.write("**Top 10 Khách hàng có nguy cơ rời bỏ cao nhất**")
-            # Chỉ tính Churn Probability một lần và lưu vào customer_segments nếu cần
-            if 'Churn Probability' not in customer_segments.columns and hasattr(churn_model, 'predict_proba'):
-                X_all = scaler.transform(customer_segments[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-                churn_probs = churn_model.predict_proba(X_all)[:, 1]
-                customer_segments['Churn Probability'] = churn_probs * 100
-            elif 'Churn Probability' not in customer_segments.columns:
-                X_all = scaler.transform(customer_segments[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
-                churn_preds = churn_model.predict(X_all)
-                customer_segments['Churn Prediction'] = churn_preds
-
-            if 'Churn Probability' in customer_segments.columns:
-                top_churn = customer_segments.sort_values('Churn Probability', ascending=False).head(10)
-                st.dataframe(
-                    top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age', 'Churn Probability']]
-                    .style.format({
-                        'Total Purchase Amount': '{:.0f}',  # Hiển thị 2 chữ số thập phân
-                        'Transaction Count': '{:.0f}',       # Số nguyên
-                        'Returns': '{:.0f}',                 # Số nguyên
-                        'Age': '{:.0f}',                     # Số nguyên
-                        'Churn Probability': '{:.2f}%'       # Hiển thị 2 chữ số thập phân với ký hiệu %
-                    }),
-                    height=300
-                )
-            else:
-                top_churn = customer_segments[customer_segments['Churn Prediction'] == 1].head(10)
-                st.dataframe(
-                    top_churn[['Customer ID', 'Customer Name', 'Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']]
-                    .style.format({
-                        'Total Purchase Amount': '{:.0f}',  # Hiển thị 2 chữ số thập phân
-                        'Transaction Count': '{:.0f}',       # Số nguyên
-                        'Returns': '{:.0f}',                 # Số nguyên
-                        'Age': '{:.0f}'                      # Số nguyên
-                    }),
-                    height=300
-                )
-
-            st.markdown("---")
-            st.write("**Xu hướng Nguy cơ Churn Theo Thời gian**")
-            if 'filtered_df' in globals() and not filtered_df.empty:
-                df_with_churn = filtered_df.merge(customer_segments[['Customer ID', 'Churn Probability']], on='Customer ID', how='left')
-                if not df_with_churn.empty and 'Churn Probability' in df_with_churn.columns:
-                    churn_trend = df_with_churn.groupby(df_with_churn['Purchase Date'].dt.to_period('M'))['Churn Probability'].mean().reset_index()
-                    churn_trend['Purchase Date'] = churn_trend['Purchase Date'].astype(str)
-                    fig_churn_trend = px.line(churn_trend, x='Purchase Date', y='Churn Probability',
-                                    title="Nguy cơ Churn Trung bình Theo Tháng", height=400, line_shape='spline')
-                    st.plotly_chart(fig_churn_trend, use_container_width=True, key="chart_churn_trend")
-                else:
-                    st.warning("Không có dữ liệu Churn Probability để hiển thị xu hướng.")
-            else:
-                st.warning("Dữ liệu filtered_df không khả dụng để hiển thị xu hướng.")
-
-            st.markdown("---")
-            st.write("**Nguy cơ Churn Theo Phân khúc Khách hàng**")
-            if 'Cluster' in customer_segments.columns and 'Churn Probability' in customer_segments.columns:
-                churn_by_cluster = customer_segments.groupby('Cluster')['Churn Probability'].mean().reset_index()
-                fig_churn_cluster = px.bar(churn_by_cluster, x='Cluster', y='Churn Probability',
-                                 title="Nguy cơ Churn Trung bình Theo Nhóm", color='Cluster',
-                                 text=churn_by_cluster['Churn Probability'].apply(lambda x: f"{x:.2f}%"), height=400)
-                fig_churn_cluster.update_traces(textposition='outside')
-                st.plotly_chart(fig_churn_cluster, use_container_width=True, key="chart_churn_by_cluster")
-            else:
-                st.warning("Không có dữ liệu Cluster hoặc Churn Probability để hiển thị phân tích.")
 
         # Tab 4: Xu hướng Thời gian
         with tabs[3]:
