@@ -168,14 +168,14 @@ X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, te
 
 # Tối ưu LogisticRegression
 param_grid_lr = {'C': [0.01, 0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
-grid_lr = GridSearchCV(LogisticRegression(max_iter=1000), param_grid_lr, cv=2, scoring='f1')
+grid_lr = GridSearchCV(LogisticRegression(max_iter=1000), param_grid_lr, cv=5, scoring='f1')
 grid_lr.fit(X_train, y_train)
 best_lr = grid_lr.best_estimator_
 
 # Tối ưu RandomForestClassifier
 rf_model = RandomForestClassifier(random_state=42)
 param_grid_rf = {'n_estimators': [100, 200], 'max_depth': [10, 20, None]}
-grid_rf = GridSearchCV(rf_model, param_grid_rf, cv=2, scoring='f1')
+grid_rf = GridSearchCV(rf_model, param_grid_rf, cv=5, scoring='f1')
 grid_rf.fit(X_train, y_train)
 best_rf = grid_rf.best_estimator_
 
