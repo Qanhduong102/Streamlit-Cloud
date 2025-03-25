@@ -465,8 +465,8 @@ elif st.session_state.get('authentication_status'):
                     new_returns = st.number_input(
                         "Returns",
                         min_value=0.0,
-                        step=0.01,       # Cho phép nhập số thập phân
-                        format="%.2f",   # Sửa từ "%.2d" thành "%.2f" để hiển thị số thập phân
+                        step=0.01,      
+                        format="%.2f",   
                         key="new_returns"
                     )
                     new_age = st.number_input(
@@ -478,11 +478,12 @@ elif st.session_state.get('authentication_status'):
                         key="new_age"
                     )
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                         analyze_button = st.form_submit_button("Dự đoán Churn", use_container_width=True)
-                    with col2:
-                         clear_button = st.form_submit_button("Xóa", use_container_width=True)
+                # Di chuyển nút "Dự đoán Churn" và "Xóa" vào vị trí cân bằng
+                col1, col2 = st.columns(2)
+                with col1:
+                    analyze_button = st.form_submit_button("Dự đoán Churn", use_container_width=True)
+                with col2:
+                    clear_button = st.form_submit_button("Xóa", use_container_width=True)
 
             # Xử lý nút Xóa
             if clear_button:
@@ -520,8 +521,12 @@ elif st.session_state.get('authentication_status'):
                     'Age': '{:.0f}'
                 }), use_container_width=True)
 
+                # Thêm điều kiện màu sắc: đỏ nếu có nguy cơ rời bỏ, xanh nếu không có nguy cơ
                 prediction_text = "có nguy cơ rời bỏ" if churn_pred == 1 else "không có nguy cơ rời bỏ"
-                st.success(f"Khách hàng {new_customer_name} {prediction_text}", icon="✅")
+                if churn_pred == 1:
+                    st.error(f"Khách hàng {new_customer_name} {prediction_text}", icon="⚠️")
+                else:
+                    st.success(f"Khách hàng {new_customer_name} {prediction_text}", icon="✅")
 
                 # Giải thích dự đoán
                 st.markdown("#### Giải thích dự đoán")
