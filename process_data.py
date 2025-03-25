@@ -2,53 +2,110 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import classification_report
-from imblearn.over_sampling import SMOTE
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
-from sklearn.linear_model import LogisticRegression
+from imblearn.over_sampling import SMOTE  # Thư viện xử lý mất cân bằng dữ liệu
 
 # Đọc và làm sạch dữ liệu
 df = pd.read_csv('cleaned_customer_data.csv', parse_dates=['Purchase Date'], dtype={
     'Customer ID': 'int32', 'Product Price': 'int32', 'Quantity': 'int32',
-    'Total Purchase Amount': 'int32', 'Age': 'int32',
+    'Total Purchase Amount': 'int32', 'Age': 'int32', 'Churn': 'int8',
     'Year': 'int16', 'Month': 'int8'
 })
-
-# Xử lý giá trị thiếu và chuẩn hóa dữ liệu
 df['Returns'] = df['Returns'].fillna(0).astype('float32')
 df['Total Purchase Amount'] = df['Product Price'] * df['Quantity']
 
 # Kiểm tra và xử lý lỗi logic
-df = df[(df['Product Price'] > 0) & (df['Quantity'] > 0) & (df['Total Purchase Amount'] > 0)]
+df = df[(df['Product Price'] > 0) & (df['Quantity'] > 0)]
 df = df.drop_duplicates(subset=['Customer ID', 'Purchase Date', 'Product Category'])
 df['Gender'] = df['Gender'].str.lower().str.strip()
 df['Payment Method'] = df['Payment Method'].str.title().str.strip()
 
 # Phân khúc khách hàng
 customer_features = df.groupby('Customer ID').agg({
-    'Customer Name': 'first',  # Lấy tên khách hàng
-    'Gender': 'first',  # Lấy giới tính
-    'Total Purchase Amount': 'sum',
-    'Purchase Date': 'count',  # Số giao dịch
-    'Returns': 'mean',
-    'Age': 'mean'
+    'Total Purchase Amount': 'sum', 'Purchase Date': 'count', 'Returns': 'mean', 'Age': 'mean'
 }).rename(columns={'Purchase Date': 'Transaction Count'})
-
-# Chuẩn hóa dữ liệu và phân cụm
-churn_scaler = StandardScaler()
-scaled_features = churn_scaler.fit_transform(customer_features[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']])
+scaler = StandardScaler()
+scaled_features = scaler.fit_transform(customer_features)
 kmeans = KMeans(n_clusters=3, random_state=42)
 customer_features['Cluster'] = kmeans.fit_predict(scaled_features)
-
-# Lưu file customer_segments.csv
 customer_features.to_csv('customer_segments.csv', index=True)
-print("Đã lưu file customer_segments.csv với các cột: Customer ID, Customer Name, Gender, Total Purchase Amount, Transaction Count, Returns, Age, Cluster")
 
-# ### Trực quan hóa và phân tích bổ sung
+# ### Tối ưu hóa dự đoán churn
+# Chuẩn bị dữ liệu
+features = customer_features.reset_index().merge(df[['Customer ID', 'Churn']].drop_duplicates(), on='Customer ID')
+X = features[['Total Purchase Amount', 'Transaction Count', 'Returns', 'Age']]
+y = features['Churn']
+
+# Trực quan hóa phân bố dữ liệu trước khi cân bằng
+plt.figure(figsize=(8, 5))
+sns.countplot(x=y, palette='Set2')
+plt.title('Phân bố dữ liệu Churn trước khi cân bằng')
+plt.xlabel('Churn')
+plt.ylabel('Số lượng')
+plt.tight_layout()
+plt.savefig('churn_distribution_before_balancing.png')
+print("Đã lưu biểu đồ phân bố dữ liệu trước khi cân bằng tại 'churn_distribution_before_balancing.png'")
+
+# Xử lý mất cân bằng dữ liệu với SMOTE
+smote = SMOTE(random_state=42)
+X_resampled, y_resampled = smote.fit_resample(X, y)
+
+# Trực quan hóa phân bố dữ liệu sau khi cân bằng
+plt.figure(figsize=(8, 5))
+sns.countplot(x=y_resampled, palette='Set2')
+plt.title('Phân bố dữ liệu Churn sau khi cân bằng với SMOTE')
+plt.xlabel('Churn')
+plt.ylabel('Số lượng')
+plt.tight_layout()
+plt.savefig('churn_distribution_after_balancing.png')
+print("Đã lưu biểu đồ phân bố dữ liệu sau khi cân bằng tại 'churn_distribution_after_balancing.png'")
+
+# Chia tập train/test với dữ liệu đã cân bằng
+X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.3, random_state=42)
+
+# Tối ưu LogisticRegression với GridSearchCV
+param_grid_lr = {'C': [0.01, 0.1, 1, 10], 'solver': ['liblinear', 'lbfgs']}
+grid_lr = GridSearchCV(LogisticRegression(max_iter=1000), param_grid_lr, cv=5, scoring='f1')
+grid_lr.fit(X_train, y_train)
+best_lr = grid_lr.best_estimator_
+print(f"Tham số tốt nhất cho LogisticRegression: {grid_lr.best_params_}")
+
+# Thử nghiệm với RandomForestClassifier
+rf_model = RandomForestClassifier(random_state=42)
+param_grid_rf = {'n_estimators': [100, 200], 'max_depth': [10, 20, None]}
+grid_rf = GridSearchCV(rf_model, param_grid_rf, cv=5, scoring='f1')
+grid_rf.fit(X_train, y_train)
+best_rf = grid_rf.best_estimator_
+print(f"Tham số tốt nhất cho RandomForest: {grid_rf.best_params_}")
+
+# Đánh giá hai mô hình
+y_pred_lr = best_lr.predict(X_test)
+y_pred_rf = best_rf.predict(X_test)
+
+print("\nBáo cáo phân loại LogisticRegression:")
+print(classification_report(y_test, y_pred_lr))
+print("\nBáo cáo phân loại RandomForest:")
+print(classification_report(y_test, y_pred_rf))
+
+# Lưu mô hình tốt nhất (chọn dựa trên F1-score của class 1)
+if classification_report(y_test, y_pred_lr, output_dict=True)['1']['f1-score'] > classification_report(y_test, y_pred_rf, output_dict=True)['1']['f1-score']:
+    churn_model = best_lr
+    y_pred = y_pred_lr
+    print("Chọn LogisticRegression làm mô hình dự đoán churn.")
+else:
+    churn_model = best_rf
+    y_pred = y_pred_rf
+    print("Chọn RandomForest làm mô hình dự đoán churn.")
+joblib.dump(churn_model, 'churn_model.pkl')
+joblib.dump(scaler, 'scaler.pkl')
+
+# ### Trực quan hóa bổ sung và đánh giá kết quả
 
 # 1. Trực quan hóa phân khúc khách hàng (Customer Segmentation)
 plt.figure(figsize=(10, 6))
@@ -61,15 +118,15 @@ plt.tight_layout()
 plt.savefig('customer_segmentation.png')
 print("Đã lưu biểu đồ phân khúc khách hàng tại 'customer_segmentation.png'")
 
-# 2. Phân tích doanh thu theo độ tuổi và giới tính
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=df, x='Gender', y='Total Purchase Amount', hue='Gender', palette='Set3')
-plt.title('Phân bố doanh thu theo Giới tính')
-plt.xlabel('Giới tính')
-plt.ylabel('Tổng chi tiêu')
+# 2. Đánh giá độ chính xác mô hình dự đoán Churn (Confusion Matrix)
+conf_matrix = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(6, 4))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', cbar=False)
+plt.title('Ma trận nhầm lẫn của mô hình dự đoán Churn')
+plt.xlabel('Dự đoán')
+plt.ylabel('Thực tế')
 plt.tight_layout()
-plt.savefig('revenue_by_gender.png')
-print("Đã lưu biểu đồ doanh thu theo giới tính tại 'revenue_by_gender.png'")
+plt.savefig('churn_confusion_matrix.png')
 
 # Phân tích theo độ tuổi
 plt.figure(figsize=(10, 6))
@@ -174,4 +231,3 @@ else:
 
 # Lưu mô hình và scaler
 joblib.dump(churn_model, 'churn_model.pkl')
-joblib.dump(churn_scaler, 'scaler.pkl')
