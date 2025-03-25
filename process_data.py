@@ -28,23 +28,6 @@ df = df.drop_duplicates(subset=['Customer ID', 'Purchase Date', 'Product Categor
 df['Gender'] = df['Gender'].str.lower().str.strip()
 df['Payment Method'] = df['Payment Method'].str.title().str.strip()
 
-# Chuẩn bị dữ liệu huấn luyện cho revenue_model
-monthly_revenue = df.groupby(df['Purchase Date'].dt.to_period('M'))['Total Purchase Amount'].sum().reset_index()
-monthly_revenue['Month_Num'] = np.arange(len(monthly_revenue))
-
-# Chuẩn hóa dữ liệu cho revenue_model
-revenue_scaler = StandardScaler()
-scaled_month_num = revenue_scaler.fit_transform(monthly_revenue[['Month_Num']])
-
-# Huấn luyện mô hình revenue_model
-revenue_model = RandomForestRegressor(random_state=42)
-revenue_model.fit(scaled_month_num, monthly_revenue['Total Purchase Amount'])
-
-# Lưu mô hình và scaler cho revenue_model
-joblib.dump(revenue_model, 'revenue_model.pkl')
-joblib.dump(revenue_scaler, 'revenue_scaler.pkl')
-print("Đã lưu revenue_model tại 'revenue_model.pkl' và revenue_scaler tại 'revenue_scaler.pkl'")
-
 # Phân khúc khách hàng
 customer_features = df.groupby('Customer ID').agg({
     'Customer Name': 'first',  # Lấy tên khách hàng
