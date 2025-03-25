@@ -447,7 +447,7 @@ elif st.session_state.get('authentication_status'):
                     new_total_purchase = st.number_input(
                         "Total Purchase Amount ($)",
                         min_value=0.0,
-                        step=100.0,
+                        step=0.01,
                         format="%.2f",
                         key="new_total_purchase"
                     )
@@ -455,9 +455,28 @@ elif st.session_state.get('authentication_status'):
                         new_total_purchase = int(new_total_purchase)
 
                 with col2:
-                    new_transaction_count = st.number_input("Transaction Count", min_value=0, step=1, format="%d", key="new_transaction_count")
-                    new_returns = st.number_input("Returns", min_value=0, step=1, format="%d", key="new_returns")
-                    new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
+                    new_transaction_count = st.number_input(
+                        "Transaction Count",
+                        min_value=0.0,
+                        step=0.01,  # Cho phép nhập số thập phân
+                        format="%.2f",  # Hiển thị 2 chữ số thập phân
+                        key="new_transaction_count"
+                    )
+                    new_returns = st.number_input(
+                        "Returns",
+                        min_value=0.0,
+                        step=0.01,  # Cho phép nhập số thập phân
+                        format="%.2f",  # Hiển thị 2 chữ số thập phân
+                        key="new_returns"
+                    )
+                    new_age = st.number_input(
+                        "Age",
+                        min_value=18.0,
+                        max_value=100.0,
+                        step=0.01,  # Cho phép nhập số thập phân
+                        format="%.2f",  # Hiển thị 2 chữ số thập phân
+                        key="new_age"
+                    )
 
                 col1, col2 = st.columns(2)
                 with col1:
