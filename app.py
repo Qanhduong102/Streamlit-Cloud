@@ -447,8 +447,8 @@ elif st.session_state.get('authentication_status'):
                     new_total_purchase = st.number_input(
                         "Total Purchase Amount ($)",
                         min_value=0.0,
-                        step=0.01,
-                        format="%.2f",
+                        step=1,
+                        format="%d",
                         key="new_total_purchase"
                     )
                     if new_total_purchase.is_integer():
@@ -458,8 +458,8 @@ elif st.session_state.get('authentication_status'):
                     new_transaction_count = st.number_input(
                         "Transaction Count",
                         min_value=0.0,
-                        step=0.01,  # Cho phép nhập số thập phân
-                        format="%.2f",  # Hiển thị 2 chữ số thập phân
+                        step=1,  # Chỉ chấp nhận số nguyên
+                        format="%d",  # Hiển thị dưới dạng số nguyên
                         key="new_transaction_count"
                     )
                     new_returns = st.number_input(
@@ -473,8 +473,8 @@ elif st.session_state.get('authentication_status'):
                         "Age",
                         min_value=18.0,
                         max_value=100.0,
-                        step=0.01,  # Cho phép nhập số thập phân
-                        format="%.2f",  # Hiển thị 2 chữ số thập phân
+                        step=1,  # Chỉ chấp nhận số nguyên
+                        format="%d",  # Hiển thị dưới dạng số nguyên
                         key="new_age"
                     )
 
@@ -514,10 +514,10 @@ elif st.session_state.get('authentication_status'):
 
                 st.markdown("### Kết quả phân tích khách hàng mới")
                 st.dataframe(new_customer_data.style.format({
-                    'Total Purchase Amount': lambda x: f"{int(x):,}" if x.is_integer() else f"{x:,.2f}",
-                    'Transaction Count': '{:.0f}',
-                    'Returns': '{:.0f}',
-                    'Age': '{:.0f}'
+                    'Total Purchase Amount': "{:,d}",  # Hiển thị số nguyên với dấu phân cách
+                    'Transaction Count': "{:d}",  # Hiển thị số nguyên
+                    'Returns': "{:.2f}",  # Hiển thị số thập phân với 2 chữ số
+                    'Age': "{:d}"  # Hiển thị số nguyên
                 }), use_container_width=True)
 
                 prediction_text = "có nguy cơ rời bỏ" if churn_pred == 1 else "không có nguy cơ rời bỏ"
