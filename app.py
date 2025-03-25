@@ -455,15 +455,34 @@ elif st.session_state.get('authentication_status'):
                         new_total_purchase = int(new_total_purchase)
 
                 with col2:
-                    new_transaction_count = st.number_input("Transaction Count", min_value=0, step=1, format="%d", key="new_transaction_count")
-                    new_returns = st.number_input("Returns", min_value=0.0, step=0.01, format="%.2d", key="new_returns")
-                    new_age = st.number_input("Age", min_value=18, max_value=100, step=1, format="%d", key="new_age")
+                    new_transaction_count = st.number_input(
+                        "Transaction Count",
+                        min_value=0,
+                        step=1,
+                        format="%d",
+                        key="new_transaction_count"
+                    )
+                    new_returns = st.number_input(
+                        "Returns",
+                        min_value=0.0,
+                        step=0.01,       # Cho phép nhập số thập phân
+                        format="%.2f",   # Sửa từ "%.2d" thành "%.2f" để hiển thị số thập phân
+                        key="new_returns"
+                    )
+                    new_age = st.number_input(
+                        "Age",
+                        min_value=18,
+                        max_value=100,
+                        step=1,
+                        format="%d",
+                        key="new_age"
+                    )
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    analyze_button = st.form_submit_button("Dự đoán Churn", use_container_width=True)
-                with col2:
-                    clear_button = st.form_submit_button("Xóa", use_container_width=True)
+                    col1, col2 = st.columns(2)
+                    with col1:
+                         analyze_button = st.form_submit_button("Dự đoán Churn", use_container_width=True)
+                    with col2:
+                         clear_button = st.form_submit_button("Xóa", use_container_width=True)
 
             # Xử lý nút Xóa
             if clear_button:
