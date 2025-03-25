@@ -514,10 +514,10 @@ elif st.session_state.get('authentication_status'):
 
                 st.markdown("### Kết quả phân tích khách hàng mới")
                 st.dataframe(new_customer_data.style.format({
-                    'Total Purchase Amount': "{:,d}",  # Hiển thị số nguyên với dấu phân cách
-                    'Transaction Count': "{:d}",  # Hiển thị số nguyên
-                    'Returns': "{:.2f}",  # Hiển thị số thập phân với 2 chữ số
-                    'Age': "{:d}"  # Hiển thị số nguyên
+                    'Total Purchase Amount': lambda x: f"{int(x):,}" if x.is_integer() else f"{x:,.2f}",
+                    'Transaction Count': '{:.0f}',
+                    'Returns': '{:.2f}',
+                    'Age': '{:.0f}'
                 }), use_container_width=True)
 
                 prediction_text = "có nguy cơ rời bỏ" if churn_pred == 1 else "không có nguy cơ rời bỏ"
@@ -563,7 +563,7 @@ elif st.session_state.get('authentication_status'):
                     st.dataframe(customer_agg.style.format({
                         'Total Purchase Amount': '{:,.0f}',
                         'Transaction Count': '{:.0f}',
-                        'Returns': '{:.0f}',
+                        'Returns': '{:.2f}',
                         'Age': '{:.0f}',
                         'Churn': '{:.0f}'
                     }), use_container_width=True)
