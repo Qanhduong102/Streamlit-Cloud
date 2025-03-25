@@ -541,7 +541,7 @@ elif st.session_state.get('authentication_status'):
                     mean_value = customer_agg[col].mean()
                     comparison = high_text if value > mean_value else low_text
                     impact = "tăng nguy cơ rời bỏ" if (col == 'Returns' and value > mean_value) or (col != 'Returns' and value < mean_value) else "giảm nguy cơ rời bỏ"
-                    st.write(f"- {name}: {value:,.0f} ({comparison} trung bình {mean_value:,.0f}), {impact}")
+                    st.write(f"- {name}: {value:,.2f} ({comparison} trung bình {mean_value:,.0f}), {impact}")
 
             # Dự đoán Churn cho khách hàng hiện có
             st.subheader("Dự đoán Churn cho khách hàng hiện có")
